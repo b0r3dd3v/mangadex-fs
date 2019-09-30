@@ -15,7 +15,7 @@ fn main() {
     env_logger::init();
 
     let cli = clap::App::new("MangaDexFS")
-        .version("0.1.0")
+        .version("0.1.1")
         .author("bittersweetshimmer <bttrswt@protonmail.com>")
         .about("A MangaDex FUSE driver")
         .arg(
