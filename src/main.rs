@@ -16,7 +16,7 @@ fn main() {
 
     let cli = clap::App::new("MangaDexFS")
         .version("0.1.0")
-        .author("bittersweet <bttrswt@protonmail.com>")
+        .author("bittersweetshimmer <bttrswt@protonmail.com>")
         .about("A MangaDex FUSE driver")
         .arg(
             clap::Arg::with_name("path")

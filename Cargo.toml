@@ -1,8 +1,12 @@
 [package]
 name = "mangadex-fs"
 version = "0.1.0"
-authors = ["bittersweet"]
+authors = ["bittersweetshimmer"]
 edition = "2018"
+repository = "https://github.com/bittersweetshimmer/mangadex-fs"
+description = "FUSE driver using MangaDex API."
+keywords = ["fuse", "filesystem"]
+categories = ["filesystem"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,7 +14,6 @@ edition = "2018"
 fuse = "0.3.1"
 reqwest = "0.9.20"
 serde = "1.0.101"
-url = "2.1.0"
 lazy_static = "1.4.0"
 libc = "0.2.5"
 time = "0.1.42"
