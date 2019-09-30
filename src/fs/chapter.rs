@@ -3,7 +3,7 @@ use std::error::Error;
 
 use crate::api;
 use crate::fs::chapter_info::ChapterInfo;
-use crate::fs::entry::{Entry, UID, GID};
+use crate::fs::entry::{Entry, GID, UID};
 
 #[derive(Debug, Clone)]
 pub struct Hosted {
@@ -66,11 +66,16 @@ pub struct ChapterEntry {
     pub variant: Variant,
     pub time: time::Timespec,
     pub gid: GID,
-    pub uid: UID
+    pub uid: UID,
 }
 
 impl ChapterEntry {
-    pub fn get(client: &reqwest::Client, id: u64, uid: UID, gid: GID) -> Result<ChapterEntry, Box<dyn Error>> {
+    pub fn get(
+        client: &reqwest::Client,
+        id: u64,
+        uid: UID,
+        gid: GID,
+    ) -> Result<ChapterEntry, Box<dyn Error>> {
         let response = api::ChapterResponse::get(&client, id)?;
 
         let now = chrono::offset::Utc::now();
@@ -96,7 +101,7 @@ impl ChapterEntry {
                 }),
             },
             uid,
-            gid
+            gid,
         });
     }
 }
@@ -137,8 +142,9 @@ impl Entry for ChapterEntry {
                 perm: 0o444,
                 nlink: match &self.variant {
                     Variant::Hosted(ref hosted) => hosted.pages.len(),
-                    Variant::External(_) => 1
-                } as u32 + 2u32,
+                    Variant::External(_) => 1,
+                } as u32
+                    + 2u32,
                 uid: self.uid.0,
                 gid: self.gid.0,
                 rdev: 0 as u32,
@@ -147,6 +153,10 @@ impl Entry for ChapterEntry {
         ))
     }
 
-    fn get_uid(&self) -> UID { self.uid }
-    fn get_gid(&self) -> GID { self.gid }
+    fn get_uid(&self) -> UID {
+        self.uid
+    }
+    fn get_gid(&self) -> GID {
+        self.gid
+    }
 }

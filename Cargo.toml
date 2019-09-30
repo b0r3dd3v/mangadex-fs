@@ -1,6 +1,6 @@
 [package]
 name = "mangadex-fs"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["bittersweetshimmer"]
 edition = "2018"
 repository = "https://github.com/bittersweetshimmer/mangadex-fs"
@@ -25,3 +25,4 @@ chrono = "0.4.9"
 clap = "2.33.0"
 env_logger = "0.7"
 log = "0.4"
+sanitize-filename = "0.2.1"

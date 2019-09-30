@@ -7,17 +7,16 @@ extern crate log;
 mod api;
 mod fs;
 
-use std::ffi::OsStr;
-
 use clap;
+use std::ffi::OsStr;
 
 fn main() {
     env_logger::init();
 
-    let cli = clap::App::new("MangaDexFS")
-        .version("0.1.1")
-        .author("bittersweetshimmer <bttrswt@protonmail.com>")
-        .about("A MangaDex FUSE driver")
+    let cli = clap::App::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(format!("{} <bttrswt@protonmail.com>", env!("CARGO_PKG_AUTHORS")).as_str())
+        .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(
             clap::Arg::with_name("path")
                 .short("p")
@@ -25,7 +24,8 @@ fn main() {
                 .takes_value(true)
                 .required(true)
                 .help("Sets the target directory of the mount"),
-        ).arg(
+        )
+        .arg(
             clap::Arg::with_name("manga")
                 .short("m")
                 .long("manga")
@@ -36,9 +36,10 @@ fn main() {
                 .help("Mounts corresponding manga")
                 .validator(|m| match m.parse::<u64>() {
                     Err(e) => Err(e.to_string()),
-                    _ => Ok(())
-                })
-        ).arg(
+                    _ => Ok(()),
+                }),
+        )
+        .arg(
             clap::Arg::with_name("threads")
                 .short("j")
                 .long("threads")
@@ -49,8 +50,16 @@ fn main() {
                 .help("Run FUSE with specified number of threads")
                 .validator(|m| match m.parse::<usize>() {
                     Err(e) => Err(e.to_string()),
-                    Ok(n) => if n == 0 { Err("costanza.jpg".to_string()) } else { Ok(()) } })
-        ).arg(
+                    Ok(n) => {
+                        if n == 0 {
+                            Err("costanza.jpg".to_string())
+                        } else {
+                            Ok(())
+                        }
+                    }
+                }),
+        )
+        .arg(
             clap::Arg::with_name("language")
                 .short("l")
                 .long("lang")
@@ -59,8 +68,9 @@ fn main() {
                 .required(false)
                 .multiple(true)
                 .default_value("gb")
-                .help("Sets language of fetched chapters, ignores the rest")   
-        ).get_matches();
+                .help("Sets language of fetched chapters, ignores the rest"),
+        )
+        .get_matches();
 
     let mut mangadex = fs::MangaDexFS::new();
 
@@ -76,5 +86,10 @@ fn main() {
     let fuse_args: Vec<&OsStr> = vec![&OsStr::new("-oallow_other"), &OsStr::new("-oauto_unmount")];
     let threads = cli.value_of("threads").unwrap().parse::<usize>().unwrap();
 
-    fuse_mt::mount(fuse_mt::FuseMT::new(mangadex, threads), &mountpoint, &fuse_args).unwrap();
+    fuse_mt::mount(
+        fuse_mt::FuseMT::new(mangadex, threads),
+        &mountpoint,
+        &fuse_args,
+    )
+    .unwrap();
 }

@@ -2,7 +2,11 @@ use chrono;
 
 use crate::api;
 use crate::fs::chapter_info::ChapterInfo;
-use crate::fs::entry::{Entry, UID, GID};
+use crate::fs::entry::{Entry, GID, UID};
+
+use sanitize_filename::sanitize;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone)]
 pub struct MangaEntry {
@@ -12,16 +16,34 @@ pub struct MangaEntry {
     pub chapters: Vec<ChapterInfo>,
     pub time: time::Timespec,
     pub uid: UID,
-    pub gid: GID
+    pub gid: GID,
 }
 
 impl MangaEntry {
+    pub fn get_hash(&self) -> u64 {
+        let mut s = DefaultHasher::new();
+        self.hash(&mut s);
+        s.finish()
+    }
+}
+
+impl Hash for MangaEntry {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl MangaEntry {
+    pub fn format(&self) -> String {
+        sanitize(format!("{} [{:06x}]", self.title, self.get_hash()))
+    }
+
     pub fn get(
         client: &reqwest::Client,
         id: u64,
         languages: &Vec<String>,
         uid: UID,
-        gid: GID
+        gid: GID,
     ) -> Result<MangaEntry, reqwest::Error> {
         let response = api::MangaResponse::get(&client, id)?;
 
@@ -56,7 +78,7 @@ impl MangaEntry {
                 .collect(),
             time: time::Timespec::new(now.timestamp(), 0i32),
             uid: uid,
-            gid: gid
+            gid: gid,
         });
     }
 }
@@ -90,13 +112,17 @@ impl Entry for MangaEntry {
                 perm: 0o444,
                 nlink: self.chapters.len() as u32 + 2,
                 uid: self.uid.0,
-                gid: self.gid.0 ,
+                gid: self.gid.0,
                 rdev: 0 as u32,
                 flags: 0,
             },
         ))
     }
 
-    fn get_uid(&self) -> UID { self.uid }
-    fn get_gid(&self) -> GID { self.gid }
+    fn get_uid(&self) -> UID {
+        self.uid
+    }
+    fn get_gid(&self) -> GID {
+        self.gid
+    }
 }

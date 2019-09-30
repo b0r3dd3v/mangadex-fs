@@ -1,14 +1,14 @@
 mod chapter;
 mod chapter_info;
+mod entry;
 mod manga;
 mod page;
-mod entry;
 
 pub use chapter::{ChapterEntry, Variant as ChapterVariant};
 pub use chapter_info::*;
+pub use entry::*;
 pub use manga::*;
 pub use page::{PageEntry, Variant as PageVariant};
-pub use entry::*;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -179,7 +179,7 @@ impl MangaDexFS {
     fn get_manga(&self, path: &Path) -> Option<MangaEntry> {
         let out = MangaDexFS::get_manga_from_path(&path).and_then(|title| {
             self.manga.iter().find_map(|(_, manga)| {
-                if manga.title == title {
+                if manga.format() == title {
                     Some(manga.clone())
                 } else {
                     None
@@ -375,7 +375,7 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
             1 => {
                 for (_, manga) in &self.manga {
                     entries.push(fuse_mt::DirectoryEntry {
-                        name: std::ffi::OsString::from(manga.title.clone()),
+                        name: std::ffi::OsString::from(manga.format()),
                         kind: fuse::FileType::Directory,
                     });
                 }
@@ -411,8 +411,9 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
 
         match path.ancestors().count() {
             4 => {
-                if let Some(page) = self.get_or_fetch_page(&path) { return result(page.read(offset, size)); }
-                else if path.file_name().unwrap().to_str().unwrap() == "external.html" {
+                if let Some(page) = self.get_or_fetch_page(&path) {
+                    return result(page.read(offset, size));
+                } else if path.file_name().unwrap().to_str().unwrap() == "external.html" {
                     if let Some(chapter) = self.get_or_fetch_chapter(&path) {
                         match chapter.variant {
                             ChapterVariant::External(external) => {
@@ -420,14 +421,14 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                                     ..std::cmp::min(
                                         offset as usize + size as usize,
                                         external.file.len(),
-                                )]));
+                                    )]));
                             }
-                            _ => return result(Err(libc::EIO))
+                            _ => return result(Err(libc::EIO)),
                         }
                     }
                 }
             }
-            _ => ()
+            _ => (),
         };
 
         result(Err(libc::ENOENT));
@@ -511,7 +512,8 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                                         time::Timespec::new(1, 0),
                                         fuse_mt::FileAttr {
                                             size: external.file.len() as u64,
-                                            blocks: (1f64 + external.file.len() as f64 / 4f64) as u64,
+                                            blocks: (1f64 + external.file.len() as f64 / 4f64)
+                                                as u64,
                                             atime: chapter.time,
                                             mtime: chapter.time,
                                             ctime: chapter.time,
@@ -526,13 +528,14 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                                         },
                                     ))
                                 }
-                                _ => ()
+                                _ => (),
                             }
                         }
                     }
-                    
+
                     None
-                }).ok_or(libc::ENOENT),
+                })
+                .ok_or(libc::ENOENT),
             _ => Err(libc::ENOENT),
         };
 

@@ -1,7 +1,7 @@
 use chrono;
 use std::error::Error;
 
-use crate::fs::entry::{Entry, UID, GID};
+use crate::fs::entry::{Entry, GID, UID};
 
 #[derive(Debug, Clone)]
 pub enum Variant {
@@ -13,7 +13,7 @@ impl Variant {
     fn get_size(&self) -> u64 {
         match self {
             Variant::Proxy { size } => size.clone(),
-            Variant::Ready { data } => data.len() as u64
+            Variant::Ready { data } => data.len() as u64,
         }
     }
 }
@@ -23,7 +23,7 @@ pub struct PageEntry {
     pub variant: Variant,
     pub time: time::Timespec,
     pub uid: UID,
-    pub gid: GID
+    pub gid: GID,
 }
 
 impl PageEntry {
@@ -39,8 +39,10 @@ impl Entry for PageEntry {
 
     fn read(&self, offset: u64, size: u32) -> Result<&[u8], libc::c_int> {
         match &self.variant {
-            Variant::Ready { data } => Ok(&data[offset as usize
-                ..std::cmp::min(offset as usize + size as usize, data.len())]),
+            Variant::Ready { data } => {
+                Ok(&data
+                    [offset as usize..std::cmp::min(offset as usize + size as usize, data.len())])
+            }
             Variant::Proxy { size: _ } => Err(libc::EIO),
         }
     }
@@ -66,8 +68,12 @@ impl Entry for PageEntry {
         ))
     }
 
-    fn get_uid(&self) -> UID { self.uid }
-    fn get_gid(&self) -> GID { self.gid }
+    fn get_uid(&self) -> UID {
+        self.uid
+    }
+    fn get_gid(&self) -> GID {
+        self.gid
+    }
 }
 
 impl PageEntry {
@@ -75,7 +81,7 @@ impl PageEntry {
         client: &reqwest::Client,
         url: &reqwest::Url,
         uid: UID,
-        gid: GID
+        gid: GID,
     ) -> Result<PageEntry, Box<dyn Error>> {
         let response = client.head(url.as_ref()).send()?;
 
@@ -94,7 +100,12 @@ impl PageEntry {
         });
     }
 
-    pub fn get(client: &reqwest::Client, url: &reqwest::Url, uid: UID, gid: GID) -> Result<PageEntry, Box<dyn Error>> {
+    pub fn get(
+        client: &reqwest::Client,
+        url: &reqwest::Url,
+        uid: UID,
+        gid: GID,
+    ) -> Result<PageEntry, Box<dyn Error>> {
         let mut response = client.get(url.as_ref()).send()?;
 
         let now = chrono::offset::Utc::now();
