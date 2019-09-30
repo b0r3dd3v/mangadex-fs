@@ -15,13 +15,12 @@ This is a basic implementation of FUSE driver utilising [MangaDex](https://manga
 ### TODO
 ---
 - check some edge cases:
-  - attach some uid & gid to entries, 
   - read more into file permission,
   - multiple chapters formatted to same directory name,
   - generating valid entry names,
 - limit requests frequency,
 - adding manga by name,
-- attach some uid & gid to entries,
+- ~~attach some uid & gid to entries,~~
 - manage filehandles instead of sloppily parsing paths (but hey it works),
 - some IPC would be really neat for managing manga at runtime,
 - less cloning, mr. borrow checker show me the way,
