@@ -8,7 +8,7 @@ This is a basic implementation of FUSE driver utilising [MangaDex](https://manga
 ---
 1. clone this repo,
 2. build `cargo build --release`,
-3. checkout `mangadex-fs -- help` on how to use,
+3. checkout `mangadex-fs --help` on how to use,
 4. please **don't abuse** MangaDex server, use with consideration,
 5. have fun reading.  
 

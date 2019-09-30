@@ -2,7 +2,7 @@ use chrono;
 
 use crate::api;
 use crate::fs::chapter_info::ChapterInfo;
-use crate::fs::entry::Entry;
+use crate::fs::entry::{Entry, UID, GID};
 
 #[derive(Debug, Clone)]
 pub struct MangaEntry {
@@ -11,6 +11,8 @@ pub struct MangaEntry {
     pub cover: reqwest::Url,
     pub chapters: Vec<ChapterInfo>,
     pub time: time::Timespec,
+    pub uid: UID,
+    pub gid: GID
 }
 
 impl MangaEntry {
@@ -18,6 +20,8 @@ impl MangaEntry {
         client: &reqwest::Client,
         id: u64,
         languages: &Vec<String>,
+        uid: UID,
+        gid: GID
     ) -> Result<MangaEntry, reqwest::Error> {
         let response = api::MangaResponse::get(&client, id)?;
 
@@ -51,6 +55,8 @@ impl MangaEntry {
                 })
                 .collect(),
             time: time::Timespec::new(now.timestamp(), 0i32),
+            uid: uid,
+            gid: gid
         });
     }
 }
@@ -83,11 +89,14 @@ impl Entry for MangaEntry {
                 kind: fuse::FileType::Directory,
                 perm: 0o444,
                 nlink: self.chapters.len() as u32 + 2,
-                uid: 0u32,
-                gid: 0u32 ,
+                uid: self.uid.0,
+                gid: self.gid.0 ,
                 rdev: 0 as u32,
                 flags: 0,
             },
         ))
     }
+
+    fn get_uid(&self) -> UID { self.uid }
+    fn get_gid(&self) -> GID { self.gid }
 }

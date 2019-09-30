@@ -4,10 +4,10 @@ mod manga;
 mod page;
 mod entry;
 
-pub use chapter::*;
+pub use chapter::{ChapterEntry, Variant as ChapterVariant};
 pub use chapter_info::*;
 pub use manga::*;
-pub use page::*;
+pub use page::{PageEntry, Variant as PageVariant};
 pub use entry::*;
 
 use std::collections::HashMap;
@@ -21,8 +21,8 @@ pub struct MangaDexFS {
     manga: HashMap<u64, MangaEntry>,
     chapters: Arc<Mutex<HashMap<u64, ChapterEntry>>>,
     pages: Arc<Mutex<HashMap<String, PageEntry>>>,
-    uid: u32,
-    gid: u32,
+    uid: UID,
+    gid: GID,
     languages: Vec<String>,
 }
 
@@ -33,8 +33,8 @@ impl MangaDexFS {
             manga: HashMap::new(),
             chapters: Arc::new(Mutex::new(HashMap::new())),
             pages: Arc::new(Mutex::new(HashMap::new())),
-            uid: nix::unistd::Uid::current().as_raw() as u32,
-            gid: nix::unistd::Gid::current().as_raw() as u32,
+            uid: UID(nix::unistd::Uid::current().as_raw() as u32),
+            gid: GID(nix::unistd::Gid::current().as_raw() as u32),
             languages: vec![],
         }
     }
@@ -46,7 +46,7 @@ impl MangaDexFS {
 
     pub fn add_manga(&mut self, id: u64) {
         info!("Fetching manga with id {}...", id);
-        match MangaEntry::get(&self.client, id, &self.languages) {
+        match MangaEntry::get(&self.client, id, &self.languages, self.uid, self.gid) {
             Ok(manga) => {
                 info!("Added manga: \"{}\"", &manga.title);
                 self.manga.insert(id, manga);
@@ -63,7 +63,7 @@ impl MangaDexFS {
 
     fn add_chapter(&self, id: u64) {
         info!("Fetching chapter with id {}...", id);
-        match ChapterEntry::get(&self.client, id) {
+        match ChapterEntry::get(&self.client, id, self.uid, self.gid) {
             Ok(chapter) => {
                 if let Ok(mut chapters) = self.chapters.lock() {
                     info!("Added chapter: \"{}\"", chapter.info.format());
@@ -81,14 +81,14 @@ impl MangaDexFS {
     }
 
     fn add_page(&self, chapter: &ChapterEntry, page_s: &String) {
-        if let ChapterMeta::Hosted(hosted) = &chapter.meta {
+        if let ChapterVariant::Hosted(hosted) = &chapter.variant {
             if let Some(url) = hosted.get_page_url(&page_s) {
                 info!(
                     "Fetching page \"{}\" from chapter \"{}\"...",
                     &page_s,
                     chapter.info.format()
                 );
-                match PageEntry::get(&self.client, &url) {
+                match PageEntry::get(&self.client, &url, self.uid, self.gid) {
                     Ok(page) => {
                         if let Ok(mut pages) = self.pages.lock() {
                             info!(
@@ -123,14 +123,14 @@ impl MangaDexFS {
     }
 
     fn add_proxy_page(&self, chapter: &ChapterEntry, page_s: &String) {
-        if let ChapterMeta::Hosted(hosted) = &chapter.meta {
+        if let ChapterVariant::Hosted(hosted) = &chapter.variant {
             if let Some(url) = hosted.get_page_url(&page_s) {
                 info!(
                     "Fetching metadata of page \"{}\" from chapter \"{}\"...",
                     &page_s,
                     chapter.info.format()
                 );
-                match PageEntry::get_proxy(&self.client, &url) {
+                match PageEntry::get_proxy(&self.client, &url, self.uid, self.gid) {
                     Ok(page) => {
                         if let Ok(mut pages) = self.pages.lock() {
                             info!(
@@ -236,8 +236,8 @@ impl MangaDexFS {
 
         if let Some(ref page_name) = page_name {
             if let Some(ref chapter) = chapter {
-                match &chapter.meta {
-                    ChapterMeta::Hosted(hosted) => {
+                match &chapter.variant {
+                    ChapterVariant::Hosted(hosted) => {
                         for page in &hosted.pages {
                             if page == page_name {
                                 if let Ok(ref pages) = self.pages.lock() {
@@ -281,8 +281,8 @@ impl MangaDexFS {
         } else {
             if let Some(chapter) = self.get_or_fetch_chapter(&path) {
                 if let Some(ref page_name) = MangaDexFS::get_page_name(&path) {
-                    match chapter.meta {
-                        ChapterMeta::Hosted(ref hosted) => {
+                    match chapter.variant {
+                        ChapterVariant::Hosted(ref hosted) => {
                             for page in &hosted.pages {
                                 if page == page_name {
                                     self.add_proxy_page(&chapter, &page_name);
@@ -301,12 +301,12 @@ impl MangaDexFS {
 
     fn get_or_fetch_page(&self, path: &Path) -> Option<PageEntry> {
         if let Some(page) = self.get_page(&path) {
-            match page {
-                PageEntry::Proxy(_) => {
+            match page.variant {
+                PageVariant::Proxy { size: _ } => {
                     if let Some(chapter) = self.get_or_fetch_chapter(&path) {
                         if let Some(ref page_name) = MangaDexFS::get_page_name(&path) {
-                            match chapter.meta {
-                                ChapterMeta::Hosted(ref hosted) => {
+                            match chapter.variant {
+                                ChapterVariant::Hosted(ref hosted) => {
                                     for page in &hosted.pages {
                                         if page == page_name {
                                             self.add_page(&chapter, &page_name);
@@ -326,8 +326,8 @@ impl MangaDexFS {
         } else {
             if let Some(chapter) = self.get_or_fetch_chapter(&path) {
                 if let Some(ref page_name) = MangaDexFS::get_page_name(&path) {
-                    match chapter.meta {
-                        ChapterMeta::Hosted(ref hosted) => {
+                    match chapter.variant {
+                        ChapterVariant::Hosted(ref hosted) => {
                             for page in &hosted.pages {
                                 if page == page_name {
                                     self.add_page(&chapter, &page_name);
@@ -414,8 +414,8 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                 if let Some(page) = self.get_or_fetch_page(&path) { return result(page.read(offset, size)); }
                 else if path.file_name().unwrap().to_str().unwrap() == "external.html" {
                     if let Some(chapter) = self.get_or_fetch_chapter(&path) {
-                        match chapter.meta {
-                            ChapterMeta::External(external) => {
+                        match chapter.variant {
+                            ChapterVariant::External(external) => {
                                 return result(Ok(&external.file[offset as usize
                                     ..std::cmp::min(
                                         offset as usize + size as usize,
@@ -452,8 +452,8 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                     kind: fuse::FileType::Directory,
                     perm: 0o444,
                     nlink: self.manga.len() as u32 + 2,
-                    uid: self.uid,
-                    gid: self.gid,
+                    uid: self.uid.0,
+                    gid: self.gid.0,
                     rdev: 0 as u32,
                     flags: 0,
                 },
@@ -485,8 +485,8 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                                     kind: fuse::FileType::Directory,
                                     perm: 0o444,
                                     nlink: 2,
-                                    uid: self.uid,
-                                    gid: self.gid,
+                                    uid: self.uid.0,
+                                    gid: self.gid.0,
                                     rdev: 0 as u32,
                                     flags: 0,
                                 },
@@ -505,8 +505,8 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                 .or_else(|| {
                     if path.file_name().unwrap().to_str().unwrap() == "external.html" {
                         if let Some(chapter) = self.get_chapter(&path) {
-                            match chapter.meta {
-                                ChapterMeta::External(external) => {
+                            match chapter.variant {
+                                ChapterVariant::External(external) => {
                                     return Some((
                                         time::Timespec::new(1, 0),
                                         fuse_mt::FileAttr {
@@ -519,8 +519,8 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                                             kind: fuse::FileType::RegularFile,
                                             perm: 0o444,
                                             nlink: 1,
-                                            uid: self.uid,
-                                            gid: self.gid,
+                                            uid: self.uid.0,
+                                            gid: self.gid.0,
                                             rdev: 0 as u32,
                                             flags: 0,
                                         },

@@ -3,7 +3,7 @@ use std::error::Error;
 
 use crate::api;
 use crate::fs::chapter_info::ChapterInfo;
-use crate::fs::entry::Entry;
+use crate::fs::entry::{Entry, UID, GID};
 
 #[derive(Debug, Clone)]
 pub struct Hosted {
@@ -18,7 +18,7 @@ pub struct External {
 }
 
 #[derive(Debug, Clone)]
-pub enum ChapterMeta {
+pub enum Variant {
     Hosted(Hosted),
     External(External),
 }
@@ -63,12 +63,14 @@ impl External {
 #[derive(Debug, Clone)]
 pub struct ChapterEntry {
     pub info: ChapterInfo,
-    pub meta: ChapterMeta,
+    pub variant: Variant,
     pub time: time::Timespec,
+    pub gid: GID,
+    pub uid: UID
 }
 
 impl ChapterEntry {
-    pub fn get(client: &reqwest::Client, id: u64) -> Result<ChapterEntry, Box<dyn Error>> {
+    pub fn get(client: &reqwest::Client, id: u64, uid: UID, gid: GID) -> Result<ChapterEntry, Box<dyn Error>> {
         let response = api::ChapterResponse::get(&client, id)?;
 
         let now = chrono::offset::Utc::now();
@@ -81,11 +83,11 @@ impl ChapterEntry {
                 title: response.title,
             },
             time: time::Timespec::new(now.timestamp(), 0i32),
-            meta: match response.external {
+            variant: match response.external {
                 Some(external) => {
-                    ChapterMeta::External(External::new(reqwest::Url::parse(&external).unwrap()))
+                    Variant::External(External::new(reqwest::Url::parse(&external).unwrap()))
                 }
-                None => ChapterMeta::Hosted(Hosted {
+                None => Variant::Hosted(Hosted {
                     url: reqwest::Url::parse(&response.server)
                         .unwrap()
                         .join(&format!("{}/", response.hash))
@@ -93,14 +95,16 @@ impl ChapterEntry {
                     pages: response.page_array,
                 }),
             },
+            uid,
+            gid
         });
     }
 }
 
 impl Entry for ChapterEntry {
     fn get_entries(&self) -> Vec<fuse_mt::DirectoryEntry> {
-        match &self.meta {
-            ChapterMeta::Hosted(hosted) => hosted
+        match &self.variant {
+            Variant::Hosted(hosted) => hosted
                 .pages
                 .iter()
                 .map(|page| fuse_mt::DirectoryEntry {
@@ -108,7 +112,7 @@ impl Entry for ChapterEntry {
                     kind: fuse::FileType::RegularFile,
                 })
                 .collect(),
-            ChapterMeta::External(_) => vec![fuse_mt::DirectoryEntry {
+            Variant::External(_) => vec![fuse_mt::DirectoryEntry {
                 name: std::ffi::OsString::from("external.html"),
                 kind: fuse::FileType::RegularFile,
             }],
@@ -131,15 +135,18 @@ impl Entry for ChapterEntry {
                 crtime: self.time,
                 kind: fuse::FileType::Directory,
                 perm: 0o444,
-                nlink: match &self.meta {
-                    ChapterMeta::Hosted(ref hosted) => hosted.pages.len(),
-                    ChapterMeta::External(_) => 1
+                nlink: match &self.variant {
+                    Variant::Hosted(ref hosted) => hosted.pages.len(),
+                    Variant::External(_) => 1
                 } as u32 + 2u32,
-                uid: 0u32,
-                gid: 0u32,
+                uid: self.uid.0,
+                gid: self.gid.0,
                 rdev: 0 as u32,
                 flags: 0,
             },
         ))
     }
+
+    fn get_uid(&self) -> UID { self.uid }
+    fn get_gid(&self) -> GID { self.gid }
 }
