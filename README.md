@@ -24,7 +24,7 @@ This is a basic implementation of FUSE driver utilising [MangaDex](https://manga
 - manage filehandles instead of sloppily parsing paths (but hey it works),
 - some IPC would be really neat for managing manga at runtime,
 - less cloning, mr. borrow checker show me the way,
-- maybe publish a crate.
+- ~~maybe publish a crate.~~
 
 ### _>Your code is a dumpster fire_
 ---

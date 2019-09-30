@@ -7,6 +7,7 @@ repository = "https://github.com/bittersweetshimmer/mangadex-fs"
 description = "FUSE driver using MangaDex API."
 keywords = ["fuse", "filesystem"]
 categories = ["filesystem"]
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
