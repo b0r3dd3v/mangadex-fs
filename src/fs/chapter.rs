@@ -94,6 +94,7 @@ impl ChapterEntry {
                 }
                 None => Variant::Hosted(Hosted {
                     url: reqwest::Url::parse(&response.server)
+                        .or(api::BASE.join(&response.server))
                         .unwrap()
                         .join(&format!("{}/", response.hash))
                         .unwrap(),
