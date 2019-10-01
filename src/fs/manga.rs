@@ -38,8 +38,7 @@ impl MangaEntry {
     pub fn format(&self) -> String {
         sanitize(format!("{} [{:06x}]", self.title, self.get_hash()))
     }
-
-    // TODO: Should "I" really implement "Clone"?
+    
     pub fn get<'a, I: IntoIterator<Item = &'a S> + Clone, S: AsRef<str> + 'a>(
         client: &reqwest::Client,
         id: u64,
@@ -54,17 +53,17 @@ impl MangaEntry {
             chapters: response
                 .chapter
                 .into_iter()
-                .filter_map(move |(chapter_id, chapter_field)| match languages.clone() // TODO: Why the hell does filter_map take FnMut?
+                .filter(|(_, chapter_field)| languages.clone()
                     .into_iter()
-                    .map(AsRef::as_ref)
-                    .any(|language| &chapter_field.lang_code == language) {
-                        true => Some(ChapterInfo {
-                            id: chapter_id,
-                            chapter: chapter_field.chapter,
-                            volume: chapter_field.volume,
-                            title: chapter_field.title,
-                        }),
-                        _ => None
+                    .any(|language| chapter_field.lang_code == language.as_ref())
+                )
+                .map(|(chapter_id, chapter_field)| {
+                    ChapterInfo {
+                        id: chapter_id,
+                        chapter: chapter_field.chapter,
+                        volume: chapter_field.volume,
+                        title: chapter_field.title,
+                    }
                 })
                 .collect(),
             time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),

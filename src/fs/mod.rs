@@ -48,9 +48,9 @@ impl MangaDexFS {
         info!("Adding language: {}", &lang);
         self.languages.push(lang);
     }
-
+    
     pub fn add_manga(&mut self, id: u64) -> Result<(), Box<dyn Error>> {
-        MangaEntry::get(&self.client, id, self.languages.iter(), self.uid, self.gid)
+        MangaEntry::get(&self.client, id, &self.languages, self.uid, self.gid)
             .map(|manga| {
                 self.manga.insert(id, manga);
                 ()
@@ -114,13 +114,7 @@ impl MangaDexFS {
 
     fn get_manga<P: AsRef<Path>>(&self, path: P) -> Option<MangaEntry> {
         MangaDexFS::get_nth_child(&path, 2).and_then(|title| {
-            self.manga.iter().find_map(|(_, manga)| {
-                if manga.format() == title {
-                    Some(manga.clone())
-                } else {
-                    None
-                }
-            })
+            self.manga.values().find(|manga| manga.format() == title).map(Clone::clone)
         })
     }
 
@@ -138,13 +132,9 @@ impl MangaDexFS {
     fn get_chapter<P: AsRef<Path>>(&self, path: P) -> Option<ChapterEntry> {
         MangaDexFS::get_nth_child(&path, 3).and_then(|chapter_name| {
             self.chapters.lock().ok().and_then(|lock| {
-                lock.iter().find_map(|(_, chapter)| {
-                    if chapter.info.format() == chapter_name {
-                        Some(chapter.clone())
-                    } else {
-                        None
-                    }
-                })
+                lock.values()
+                    .find(|chapter| chapter.info.format() == chapter_name)
+                    .map(Clone::clone)
             })
         })
     }
@@ -208,12 +198,7 @@ impl MangaDexFS {
                                 manga
                                     .chapters
                                     .iter()
-                                    .find_map(|chapter_info| {
-                                        match chapter_info.format() == chapter_name {
-                                            true => Some(chapter_info),
-                                            _ => None
-                                        }
-                                    })
+                                    .find(|chapter_info| chapter_info.format() == chapter_name)
                                     .ok_or("Chapter not found.".into())
                                     .and_then(|chapter_info| {
                                         self.add_chapter(chapter_info.id)
@@ -410,13 +395,7 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
                                 manga
                                     .chapters
                                     .iter()
-                                    .find_map(|chapter_info| {
-                                        if chapter_info.format() == chapter_name {
-                                            Some(chapter_info)
-                                        } else {
-                                            None
-                                        }
-                                    })
+                                    .find(|chapter_info| chapter_info.format() == chapter_name)
                                     .ok_or(libc::ENOENT)
                                     .and_then(|_| manga.get_attributes())
                             })
