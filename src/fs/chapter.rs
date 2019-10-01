@@ -24,11 +24,15 @@ pub enum Variant {
 }
 
 impl Hosted {
-    pub fn get_page_url(&self, page: &String) -> Option<reqwest::Url> {
+    // Is this even idiomatic? https://www.philipdaniels.com/blog/2019/rust-api-design/
+    pub fn get_page_url<S: Into<String>>(&self, page: S) -> Result<reqwest::Url, Box<dyn Error>> {
+        let page = page.into();
+
         if self.pages.contains(&page) {
-            self.url.join(page).ok()
-        } else {
-            None
+            self.url.join(&page).map_err(|e| e.into())
+        }
+        else {
+            Err(format!("Chapter doesn't contain page\"{}\"", &page).into())
         }
     }
 }
@@ -76,18 +80,14 @@ impl ChapterEntry {
         uid: UID,
         gid: GID,
     ) -> Result<ChapterEntry, Box<dyn Error>> {
-        let response = api::ChapterResponse::get(&client, id)?;
-
-        let now = chrono::offset::Utc::now();
-
-        return Ok(ChapterEntry {
+        api::ChapterResponse::get(&client, id).map(|response| ChapterEntry {
             info: ChapterInfo {
                 id,
                 chapter: response.chapter,
                 volume: response.volume,
                 title: response.title,
             },
-            time: time::Timespec::new(now.timestamp(), 0i32),
+            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
             variant: match response.external {
                 Some(external) => {
                     Variant::External(External::new(reqwest::Url::parse(&external).unwrap()))
@@ -103,14 +103,14 @@ impl ChapterEntry {
             },
             uid,
             gid,
-        });
+        }).map_err(|e| e.into())
     }
 }
 
 impl Entry for ChapterEntry {
     fn get_entries(&self) -> Vec<fuse_mt::DirectoryEntry> {
         match &self.variant {
-            Variant::Hosted(hosted) => hosted
+            Variant::Hosted(ref hosted) => hosted
                 .pages
                 .iter()
                 .map(|page| fuse_mt::DirectoryEntry {
@@ -119,7 +119,7 @@ impl Entry for ChapterEntry {
                 })
                 .collect(),
             Variant::External(_) => vec![fuse_mt::DirectoryEntry {
-                name: std::ffi::OsString::from("external.html"),
+                name: "external.html".into(),
                 kind: fuse::FileType::RegularFile,
             }],
         }

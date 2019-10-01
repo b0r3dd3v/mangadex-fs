@@ -26,26 +26,28 @@ impl Hash for ChapterInfo {
 
 impl ChapterInfo {
     pub fn format(&self) -> String {
+        let hash = self.get_hash();
+
         match (self.title.is_empty(), self.volume.is_empty()) {
-            (true, true) => sanitize(format!("{} [{:06x}]", self.chapter, self.get_hash())),
+            (true, true) => sanitize(format!("{} [{:06x}]", self.chapter, hash)),
             (true, false) => sanitize(format!(
                 "{}.{} [{:06x}]",
                 self.volume,
                 self.chapter,
-                self.get_hash()
+                hash
             )),
             (false, true) => sanitize(format!(
                 "{} {} [{:06x}]",
                 self.chapter,
                 self.title,
-                self.get_hash()
+                hash
             )),
             _ => sanitize(format!(
                 "{}.{} {} [{:06x}]",
                 self.volume,
                 self.chapter,
                 self.title,
-                self.get_hash()
+                hash
             )),
         }
     }

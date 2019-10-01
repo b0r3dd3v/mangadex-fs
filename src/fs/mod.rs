@@ -4,13 +4,14 @@ mod entry;
 mod manga;
 mod page;
 
-pub use chapter::{ChapterEntry, Variant as ChapterVariant};
+pub use chapter::{ChapterEntry, External, Hosted, Variant as ChapterVariant};
 pub use chapter_info::*;
 pub use entry::*;
 pub use manga::*;
 pub use page::{PageEntry, Variant as PageVariant};
 
 use std::collections::HashMap;
+use std::error::Error;
 use std::path::Path;
 
 use fuse_mt;
@@ -23,6 +24,7 @@ pub struct MangaDexFS {
     pages: Arc<Mutex<HashMap<String, PageEntry>>>,
     uid: UID,
     gid: GID,
+    time: time::Timespec,
     languages: Vec<String>,
 }
 
@@ -36,148 +38,82 @@ impl MangaDexFS {
             uid: UID(nix::unistd::Uid::current().as_raw() as u32),
             gid: GID(nix::unistd::Gid::current().as_raw() as u32),
             languages: vec![],
+            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32)
         }
     }
 
-    pub fn add_langauge(&mut self, lang: String) {
-        info!("Adding language: {}", lang);
+    pub fn add_language<S: Into<String>>(&mut self, lang: S) {
+        let lang = lang.into();
+
+        info!("Adding language: {}", &lang);
         self.languages.push(lang);
     }
 
-    pub fn add_manga(&mut self, id: u64) {
-        info!("Fetching manga with id {}...", id);
-        match MangaEntry::get(&self.client, id, &self.languages, self.uid, self.gid) {
-            Ok(manga) => {
-                info!("Added manga: \"{}\"", &manga.title);
+    pub fn add_manga(&mut self, id: u64) -> Result<(), Box<dyn Error>> {
+        MangaEntry::get(&self.client, id, self.languages.iter(), self.uid, self.gid)
+            .map(|manga| {
                 self.manga.insert(id, manga);
-            }
-            Err(e) => {
-                warn!(
-                    "Failure on fetching manga with id {}, reason: {}",
-                    id,
-                    e.to_string()
-                );
-            }
-        }
+                ()
+            })
+            .map_err(Into::into)
     }
 
-    fn add_chapter(&self, id: u64) {
-        info!("Fetching chapter with id {}...", id);
-        match ChapterEntry::get(&self.client, id, self.uid, self.gid) {
-            Ok(chapter) => {
-                if let Ok(mut chapters) = self.chapters.lock() {
-                    info!("Added chapter: \"{}\"", chapter.info.format());
-                    chapters.insert(id, chapter);
-                }
-            }
-            Err(e) => {
-                warn!(
-                    "Failure on fetching chapter with id {}, reason: {}",
-                    id,
-                    e.to_string()
-                );
-            }
-        }
+    fn add_chapter(&self, id: u64) -> Result<(), Box<dyn Error>> {
+        ChapterEntry::get(&self.client, id, self.uid, self.gid)
+            .map_err(Into::into)
+            .and_then(|chapter| {
+                self.chapters
+                    .lock()
+                    .as_mut()
+                    .map(|chapters| {
+                        chapters.insert(id, chapter);
+                        ()
+                    })
+                    .map_err(|e| e.to_string().into())
+            })
     }
 
-    fn add_page(&self, chapter: &ChapterEntry, page_s: &String) {
-        if let ChapterVariant::Hosted(hosted) = &chapter.variant {
-            if let Some(url) = hosted.get_page_url(&page_s) {
-                info!(
-                    "Fetching page \"{}\" from chapter \"{}\"...",
-                    &page_s,
-                    chapter.info.format()
-                );
-                match PageEntry::get(&self.client, &url, self.uid, self.gid) {
-                    Ok(page) => {
-                        if let Ok(mut pages) = self.pages.lock() {
-                            info!(
-                                "Added page: \"{}\" from chapter \"{}\"",
-                                &page_s,
-                                chapter.info.format()
-                            );
-                            pages.insert(url.into_string(), page);
-                        }
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failure on fetching page from \"{}\", reason: {}",
-                            url.into_string(),
-                            e.to_string()
-                        );
-                    }
-                }
-            } else {
-                warn!(
-                    "Chapter \"{}\" doesn't contain page \"{}\"",
-                    chapter.info.format(),
-                    page_s
-                );
-            }
-        } else {
-            debug!(
-                "Attempt to fetch chapter of id \"{}\" from external host?",
-                chapter.info.id
-            );
-        }
+    fn add_page<S: AsRef<str>>(&self, hosted: &Hosted, page_s: S) -> Result<(), Box<dyn Error>> {
+        hosted.get_page_url(page_s.as_ref()).and_then(|url| {
+            PageEntry::get(&self.client, &url, self.uid, self.gid).and_then(|page| {
+                self.pages
+                    .lock()
+                    .as_mut()
+                    .map(|pages| {
+                        pages.insert(url.into_string(), page);
+                        ()
+                    })
+                    .map_err(|e| e.to_string().into())
+            })
+        })
     }
 
-    fn add_proxy_page(&self, chapter: &ChapterEntry, page_s: &String) {
-        if let ChapterVariant::Hosted(hosted) = &chapter.variant {
-            if let Some(url) = hosted.get_page_url(&page_s) {
-                info!(
-                    "Fetching metadata of page \"{}\" from chapter \"{}\"...",
-                    &page_s,
-                    chapter.info.format()
-                );
-                match PageEntry::get_proxy(&self.client, &url, self.uid, self.gid) {
-                    Ok(page) => {
-                        if let Ok(mut pages) = self.pages.lock() {
-                            info!(
-                                "Added metadata of page: \"{}\" from chapter \"{}\"",
-                                &page_s,
-                                chapter.info.format()
-                            );
-                            pages.insert(url.into_string(), page);
-                        }
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failure on fetching metadata of page from \"{}\", reason: {}",
-                            url.into_string(),
-                            e.to_string()
-                        );
-                    }
-                }
-            } else {
-                warn!(
-                    "Chapter \"{}\" doesn't contain page \"{}\"",
-                    chapter.info.format(),
-                    page_s
-                );
-            }
-        } else {
-            debug!(
-                "Attempt to fetch metadata of chapter of id \"{}\" from external host?",
-                chapter.info.id
-            );
-        }
+    fn add_proxy_page<S: Into<String>>(
+        &self,
+        hosted: &Hosted,
+        page_s: S,
+    ) -> Result<(), Box<dyn Error>> {
+        hosted.get_page_url(page_s.into()).and_then(|url| {
+            PageEntry::get_proxy(&self.client, &url, self.uid, self.gid).and_then(|page| {
+                self.pages
+                    .lock()
+                    .as_mut()
+                    .map(|pages| {
+                        pages.insert(url.into_string(), page);
+                        ()
+                    })
+                    .map_err(|e| e.to_string().into())
+            })
+        })
     }
 
-    fn get_manga_from_path(path: &Path) -> Option<String> {
-        let out = path
-            .ancestors()
-            .nth(path.ancestors().count() - 2)
-            .take()
-            .and_then(|x| x.file_name())
-            .and_then(|x| x.to_str())
-            .map(|x| x.into());
-
-        out
+    #[allow(dead_code)]
+    fn get_manga_by_id(&self, id: u64) -> Option<MangaEntry> {
+        self.manga.get(&id).map(Clone::clone)
     }
 
-    fn get_manga(&self, path: &Path) -> Option<MangaEntry> {
-        let out = MangaDexFS::get_manga_from_path(&path).and_then(|title| {
+    fn get_manga<P: AsRef<Path>>(&self, path: P) -> Option<MangaEntry> {
+        MangaDexFS::get_nth_child(&path, 2).and_then(|title| {
             self.manga.iter().find_map(|(_, manga)| {
                 if manga.format() == title {
                     Some(manga.clone())
@@ -185,163 +121,139 @@ impl MangaDexFS {
                     None
                 }
             })
-        });
-
-        out
+        })
     }
 
-    fn get_chapter_from_path(path: &Path) -> Option<String> {
-        let out = path
-            .ancestors()
-            .nth(path.ancestors().count() - 3)
-            .take()
-            .and_then(|x| x.file_name())
-            .and_then(|x| x.to_str())
-            .map(|x| x.into());
-
-        out
+    fn get_chapter_by_id(&self, id: u64) -> Result<ChapterEntry, Box<dyn Error>> {
+        self.chapters
+            .lock()
+            .map_err(|e| e.to_string().into())
+            .and_then(|lock| {
+                lock.get(&id)
+                    .map(Clone::clone)
+                    .ok_or(format!("Chapter of id {} not found", id).into())
+            })
     }
 
-    fn get_chapter(&self, path: &Path) -> Option<ChapterEntry> {
-        let out = MangaDexFS::get_chapter_from_path(path).and_then(|chapter_name| {
+    fn get_chapter<P: AsRef<Path>>(&self, path: P) -> Option<ChapterEntry> {
+        MangaDexFS::get_nth_child(&path, 3).and_then(|chapter_name| {
             self.chapters.lock().ok().and_then(|lock| {
                 lock.iter().find_map(|(_, chapter)| {
-                    let formatted = chapter.info.format();
-                    if formatted == chapter_name {
+                    if chapter.info.format() == chapter_name {
                         Some(chapter.clone())
                     } else {
                         None
                     }
                 })
             })
-        });
-
-        out
+        })
     }
 
-    fn get_page_name(path: &Path) -> Option<String> {
-        let out = path
+    fn get_nth_child<'a, P: AsRef<Path>>(path: &'a P, n: usize) -> Option<&'a str> {
+        path.as_ref()
             .ancestors()
-            .nth(path.ancestors().count() - 4)
+            .nth(path.as_ref().ancestors().count() - n)
             .take()
             .and_then(|x| x.file_name())
             .and_then(|x| x.to_str())
-            .map(|x| x.into());
-        out
     }
 
-    fn get_page(&self, path: &Path) -> Option<PageEntry> {
-        let chapter = self.get_chapter(&path);
-        let page_name = MangaDexFS::get_page_name(&path);
-
-        if let Some(ref page_name) = page_name {
-            if let Some(ref chapter) = chapter {
-                match &chapter.variant {
-                    ChapterVariant::Hosted(hosted) => {
-                        for page in &hosted.pages {
-                            if page == page_name {
-                                if let Ok(ref pages) = self.pages.lock() {
-                                    return pages
-                                        .get(&hosted.get_page_url(page_name).unwrap().into_string())
-                                        .map(|x| x.clone());
-                                }
-                            }
-                        }
-                    }
-                    _ => (),
-                }
-            }
-        }
-
-        None
+    #[allow(dead_code)]
+    fn get_page_by_url(&self, url: &reqwest::Url) -> Result<PageEntry, Box<dyn Error>> {
+        self.pages
+            .lock()
+            .map_err(|e| e.to_string().into())
+            .and_then(|lock| {
+                lock.get(&url.to_string())
+                    .map(Clone::clone)
+                    .ok_or("Page not found".into())
+            })
     }
 
-    fn get_or_fetch_chapter(&self, path: &Path) -> Option<ChapterEntry> {
-        if let Some(chapter) = self.get_chapter(path) {
-            Some(chapter)
-        } else {
-            if let Some(chapter_name) = MangaDexFS::get_chapter_from_path(&path) {
-                if let Some(manga) = self.get_manga(&path) {
-                    for chapter_info in &manga.chapters {
-                        if chapter_info.format() == chapter_name {
-                            self.add_chapter(chapter_info.id);
-                            return self.get_chapter(path);
-                        }
-                    }
-                }
-            }
-
-            None
-        }
+    fn get_page<P: AsRef<Path>>(
+        &self,
+        hosted: &Hosted,
+        path: P,
+    ) -> Result<PageEntry, Box<dyn Error>> {
+        MangaDexFS::get_nth_child(&path, 4)
+            .ok_or("Invalid path.".into())
+            .and_then(|page| {
+                self.pages
+                    .lock()
+                    .map_err(|e| e.to_string().into())
+                    .and_then(|pages| {
+                        hosted.get_page_url(page.to_string()).and_then(|url| {
+                            pages
+                                .get(&url.to_string())
+                                .map(Clone::clone)
+                                .ok_or("Page not found".into())
+                        })
+                    })
+            })
     }
 
-    fn get_or_fetch_proxy_page(&self, path: &Path) -> Option<PageEntry> {
-        if let Some(page) = self.get_page(&path) {
-            Some(page)
-        } else {
-            if let Some(chapter) = self.get_or_fetch_chapter(&path) {
-                if let Some(ref page_name) = MangaDexFS::get_page_name(&path) {
-                    match chapter.variant {
-                        ChapterVariant::Hosted(ref hosted) => {
-                            for page in &hosted.pages {
-                                if page == page_name {
-                                    self.add_proxy_page(&chapter, &page_name);
-                                    return self.get_page(&path);
-                                }
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-            }
-
-            None
-        }
-    }
-
-    fn get_or_fetch_page(&self, path: &Path) -> Option<PageEntry> {
-        if let Some(page) = self.get_page(&path) {
-            match page.variant {
-                PageVariant::Proxy { size: _ } => {
-                    if let Some(chapter) = self.get_or_fetch_chapter(&path) {
-                        if let Some(ref page_name) = MangaDexFS::get_page_name(&path) {
-                            match chapter.variant {
-                                ChapterVariant::Hosted(ref hosted) => {
-                                    for page in &hosted.pages {
-                                        if page == page_name {
-                                            self.add_page(&chapter, &page_name);
-                                            return self.get_page(&path);
+    fn get_or_fetch_chapter<'a, P: AsRef<Path>>(
+        &self,
+        path: &'a P,
+    ) -> Result<ChapterEntry, Box<dyn Error>> {
+        self.get_chapter(&path)
+            .ok_or("Chapter hasn't been fetched yet.".into())
+            .or_else(|_: Box<dyn Error>| {
+                MangaDexFS::get_nth_child(&path, 3)
+                    .ok_or("Invalid path.".into())
+                    .and_then(|chapter_name| {
+                        self.get_manga(&path)
+                            .ok_or("Manga not found.".into())
+                            .and_then(|manga| {
+                                manga
+                                    .chapters
+                                    .iter()
+                                    .find_map(|chapter_info| {
+                                        match chapter_info.format() == chapter_name {
+                                            true => Some(chapter_info),
+                                            _ => None
                                         }
-                                    }
-                                }
-                                _ => (),
-                            }
-                        }
-                    }
+                                    })
+                                    .ok_or("Chapter not found.".into())
+                                    .and_then(|chapter_info| {
+                                        self.add_chapter(chapter_info.id)
+                                            .and_then(|_| self.get_chapter_by_id(chapter_info.id))
+                                    })
+                            })
+                    })
+            })
+    }
 
-                    None
-                }
-                _ => Some(page),
-            }
-        } else {
-            if let Some(chapter) = self.get_or_fetch_chapter(&path) {
-                if let Some(ref page_name) = MangaDexFS::get_page_name(&path) {
-                    match chapter.variant {
-                        ChapterVariant::Hosted(ref hosted) => {
-                            for page in &hosted.pages {
-                                if page == page_name {
-                                    self.add_page(&chapter, &page_name);
-                                    return self.get_page(&path);
-                                }
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-            }
+    fn get_or_fetch_proxy_page<'a, P: AsRef<Path>>(
+        &self,
+        hosted: &Hosted,
+        path: &'a P,
+    ) -> Result<PageEntry, Box<dyn Error>> {
+        self.get_page(hosted, path).or_else(|_| {
+            MangaDexFS::get_nth_child(&path, 4)
+                .ok_or("Invalid path.".into())
+                .and_then(|page_name| self.add_proxy_page(hosted, page_name))
+                .and_then(|_| self.get_page(hosted, path.as_ref()))
+        })
+    }
 
-            None
-        }
+    fn get_or_fetch_page<P: AsRef<Path>>(
+        &self,
+        hosted: &Hosted,
+        path: P,
+    ) -> Result<PageEntry, Box<dyn Error>> {
+        self.get_page(hosted, &path)
+            .and_then(|entry| match entry.variant {
+                PageVariant::Ready { data: _ } => Ok(entry),
+                PageVariant::Proxy { size: _ } => MangaDexFS::get_nth_child(&path, 4)
+                    .ok_or("Invalid path.".into())
+                    .and_then(|page_name| {
+                        hosted
+                            .get_page_url(page_name)
+                            .and_then(|_| self.add_page(hosted, page_name))
+                            .and_then(|_| self.get_page(hosted, &path))
+                    }),
+            })
     }
 }
 
@@ -370,32 +282,44 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
             kind: fuse::FileType::Directory,
         });
 
-        let out = match path.ancestors().count() {
-            0 => Ok(entries),
-            1 => {
-                for (_, manga) in &self.manga {
-                    entries.push(fuse_mt::DirectoryEntry {
-                        name: std::ffi::OsString::from(manga.format()),
-                        kind: fuse::FileType::Directory,
-                    });
-                }
+        let level = path.ancestors().count();
 
-                Ok(entries)
-            }
+        if level >= 4 {
+            warn!("Path {:?} is too deep.", path);
+            return Err(libc::ENOENT);
+        }
+
+        let entries_found = match level {
+            1 => self.manga.iter().map(|(_, manga)| {
+                Ok(fuse_mt::DirectoryEntry {
+                    name: std::ffi::OsString::from(manga.format()),
+                    kind: fuse::FileType::Directory,
+                })
+            }).collect(),
             2 => self
                 .get_manga(&path)
                 .map(|manga| manga.get_entries())
-                .ok_or_else(|| libc::ENOENT),
+                .ok_or("Manga not found.".into()),
             3 => self
                 .get_or_fetch_chapter(&path)
-                .map(|chapter| chapter.get_entries())
-                .ok_or_else(|| libc::ENOENT),
-            _ => Err(libc::ENOENT),
+                .map(|chapter| chapter.get_entries()),
+            _ => Ok(vec![])
+        };
+        
+        match entries_found {
+            Ok(found) => {
+                for entry in found {
+                    entries.push(entry);
+                }
+            },
+            Err(e) => {
+                warn!("readdir of path \"{:?}\": {}", path, e);
+            }
         };
 
         debug!("readdir: {:?}", path);
 
-        out
+        Ok(entries)
     }
 
     fn read(
@@ -411,27 +335,36 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
 
         match path.ancestors().count() {
             4 => {
-                if let Some(page) = self.get_or_fetch_page(&path) {
-                    return result(page.read(offset, size));
-                } else if path.file_name().unwrap().to_str().unwrap() == "external.html" {
-                    if let Some(chapter) = self.get_or_fetch_chapter(&path) {
-                        match chapter.variant {
-                            ChapterVariant::External(external) => {
-                                return result(Ok(&external.file[offset as usize
-                                    ..std::cmp::min(
-                                        offset as usize + size as usize,
-                                        external.file.len(),
-                                    )]));
+                match self.get_or_fetch_chapter(&path) {
+                    Ok(chapter) => match chapter.variant {
+                        ChapterVariant::Hosted(hosted) => {
+                            match self.get_or_fetch_page(&hosted, path) {
+                                Ok(page) => result(page.read(offset, size)),
+                                _ => result(Err(libc::ENOENT)),
                             }
-                            _ => return result(Err(libc::EIO)),
                         }
-                    }
+                        ChapterVariant::External(external) => {
+                            match path.file_name().and_then(std::ffi::OsStr::to_str) {
+                                Some(filename) => {
+                                    if filename == "external.html" {
+                                        result(Ok(&external.file[offset as usize
+                                            ..std::cmp::min(
+                                                offset as usize + size as usize,
+                                                external.file.len(),
+                                            )]));
+                                    } else {
+                                        result(Err(libc::ENOENT)); // TODO: These result(Err(...) branches look non-idiomiatic, but result is FnOnce?
+                                    }
+                                }
+                                _ => result(Err(libc::ENOENT)),
+                            }
+                        }
+                    },
+                    _ => result(Err(libc::ENOENT)),
                 }
             }
-            _ => (),
+            _ => result(Err(libc::ENOENT)),
         };
-
-        result(Err(libc::ENOENT));
     }
 
     fn getattr(
@@ -440,16 +373,18 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
         path: &Path,
         _fh: Option<u64>,
     ) -> fuse_mt::ResultEntry {
-        let out = match path.ancestors().count() {
+        debug!("getattr: {:?}", path);
+
+        match path.ancestors().count() {
             0 | 1 => Ok((
                 time::Timespec::new(1, 0),
                 fuse_mt::FileAttr {
                     size: 4096 as u64,
                     blocks: 4 as u64,
-                    atime: time::Timespec::new(1, 0),
-                    mtime: time::Timespec::new(1, 0),
-                    ctime: time::Timespec::new(1, 0),
-                    crtime: time::Timespec::new(1, 0),
+                    atime: self.time,
+                    mtime: self.time,
+                    ctime: self.time,
+                    crtime: self.time,
                     kind: fuse::FileType::Directory,
                     perm: 0o444,
                     nlink: self.manga.len() as u32 + 2,
@@ -461,86 +396,60 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
             )),
             2 => self
                 .get_manga(&path)
-                .and_then(|manga| manga.get_attributes().ok())
-                .ok_or(libc::ENOENT),
+                .ok_or(libc::ENOENT)
+                .and_then(|manga| manga.get_attributes()),
             3 => self
                 .get_chapter(&path)
-                .and_then(|chapter| chapter.get_attributes().ok())
-                .or_else(|| {
-                    if let Some(manga) = self.get_manga(&path) {
-                        let chapter_name = MangaDexFS::get_chapter_from_path(path).unwrap();
-                        if manga
-                            .chapters
-                            .iter()
-                            .any(|chapter| chapter_name == chapter.format())
-                        {
-                            Some((
-                                time::Timespec::new(1, 0),
-                                fuse_mt::FileAttr {
-                                    size: 4096 as u64,
-                                    blocks: 4 as u64,
-                                    atime: manga.time,
-                                    mtime: manga.time,
-                                    ctime: manga.time,
-                                    crtime: manga.time,
-                                    kind: fuse::FileType::Directory,
-                                    perm: 0o444,
-                                    nlink: 2,
-                                    uid: self.uid.0,
-                                    gid: self.gid.0,
-                                    rdev: 0 as u32,
-                                    flags: 0,
-                                },
-                            ))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .ok_or(libc::ENOENT),
+                .ok_or(libc::ENOENT)
+                .and_then(|chapter| chapter.get_attributes())
+                .or_else(|_| {
+                    MangaDexFS::get_nth_child(&path, 3)
+                        .ok_or(libc::ENOENT)
+                        .and_then(|chapter_name| {
+                            self.get_manga(&path).ok_or(libc::ENOENT).and_then(|manga| {
+                                manga
+                                    .chapters
+                                    .iter()
+                                    .find_map(|chapter_info| {
+                                        if chapter_info.format() == chapter_name {
+                                            Some(chapter_info)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .ok_or(libc::ENOENT)
+                                    .and_then(|_| manga.get_attributes())
+                            })
+                        })
+                }),
             4 => self
-                .get_or_fetch_proxy_page(&path)
-                .and_then(|page| page.get_attributes().ok())
-                .or_else(|| {
-                    if path.file_name().unwrap().to_str().unwrap() == "external.html" {
-                        if let Some(chapter) = self.get_chapter(&path) {
-                            match chapter.variant {
-                                ChapterVariant::External(external) => {
-                                    return Some((
-                                        time::Timespec::new(1, 0),
-                                        fuse_mt::FileAttr {
-                                            size: external.file.len() as u64,
-                                            blocks: (1f64 + external.file.len() as f64 / 4f64)
-                                                as u64,
-                                            atime: chapter.time,
-                                            mtime: chapter.time,
-                                            ctime: chapter.time,
-                                            crtime: chapter.time,
-                                            kind: fuse::FileType::RegularFile,
-                                            perm: 0o444,
-                                            nlink: 1,
-                                            uid: self.uid.0,
-                                            gid: self.gid.0,
-                                            rdev: 0 as u32,
-                                            flags: 0,
-                                        },
-                                    ))
-                                }
-                                _ => (),
-                            }
-                        }
-                    }
-
-                    None
-                })
-                .ok_or(libc::ENOENT),
+                .get_chapter(&path)
+                .ok_or(libc::ENOENT)
+                .and_then(|chapter| match chapter.variant {
+                    ChapterVariant::Hosted(ref hosted) => self
+                        .get_or_fetch_proxy_page(hosted, &path)
+                        .map_err(|_| libc::ENOENT)
+                        .and_then(|page| page.get_attributes()),
+                    ChapterVariant::External(ref external) => Ok((
+                        time::Timespec::new(1, 0),
+                        fuse_mt::FileAttr {
+                            size: external.file.len() as u64,
+                            blocks: (1f64 + external.file.len() as f64 / 4f64) as u64,
+                            atime: chapter.time,
+                            mtime: chapter.time,
+                            ctime: chapter.time,
+                            crtime: chapter.time,
+                            kind: fuse::FileType::RegularFile,
+                            perm: 0o444,
+                            nlink: 1u32,
+                            uid: chapter.uid.0,
+                            gid: chapter.gid.0,
+                            rdev: 0 as u32,
+                            flags: 0,
+                        },
+                    )),
+                }),
             _ => Err(libc::ENOENT),
-        };
-
-        debug!("getattr: {:?}", path);
-
-        out
+        }
     }
 }

@@ -75,11 +75,13 @@ fn main() {
     let mut mangadex = fs::MangaDexFS::new();
 
     for lang in cli.values_of("language").unwrap() {
-        mangadex.add_langauge(lang.to_string());
+        mangadex.add_language(lang);
     }
 
     for id in cli.values_of("manga").unwrap() {
-        mangadex.add_manga(id.parse::<u64>().unwrap());
+        #[allow(unused_must_use)] {
+            mangadex.add_manga(id.parse::<u64>().unwrap());
+        }
     }
 
     let mountpoint = cli.value_of("path").unwrap();

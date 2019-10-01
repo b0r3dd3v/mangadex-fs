@@ -7,6 +7,7 @@ use crate::fs::entry::{Entry, GID, UID};
 use sanitize_filename::sanitize;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct MangaEntry {
@@ -38,48 +39,39 @@ impl MangaEntry {
         sanitize(format!("{} [{:06x}]", self.title, self.get_hash()))
     }
 
-    pub fn get(
+    // TODO: Should "I" really implement "Clone"?
+    pub fn get<'a, I: IntoIterator<Item = &'a S> + Clone, S: AsRef<str> + 'a>(
         client: &reqwest::Client,
         id: u64,
-        languages: &Vec<String>,
+        languages: I,
         uid: UID,
         gid: GID,
-    ) -> Result<MangaEntry, reqwest::Error> {
-        let response = api::MangaResponse::get(&client, id)?;
-
-        let now = chrono::offset::Utc::now();
-
-        return Ok(MangaEntry {
+    ) -> Result<MangaEntry, Box<dyn Error>> {
+        api::MangaResponse::get(&client, id).map(|response| MangaEntry {
             id: id,
             title: response.manga.title,
             cover: api::BASE.join(&response.manga.cover_url).unwrap(),
             chapters: response
                 .chapter
                 .into_iter()
-                .filter_map(|(chapter_id, chapter_field)| {
-                    if languages
-                        .iter()
-                        .any(|language| &chapter_field.lang_code == language)
-                    {
-                        Some(ChapterInfo {
+                .filter_map(move |(chapter_id, chapter_field)| match languages.clone() // TODO: Why the hell does filter_map take FnMut?
+                    .into_iter()
+                    .map(AsRef::as_ref)
+                    .any(|language| &chapter_field.lang_code == language) {
+                        true => Some(ChapterInfo {
                             id: chapter_id,
                             chapter: chapter_field.chapter,
                             volume: chapter_field.volume,
                             title: chapter_field.title,
-                        })
-                    } else {
-                        debug!(
-                            "language {} not found in given languages: {:?}, skipping...",
-                            &chapter_field.lang_code, languages
-                        );
-                        None
-                    }
+                        }),
+                        _ => None
                 })
                 .collect(),
-            time: time::Timespec::new(now.timestamp(), 0i32),
+            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
             uid: uid,
             gid: gid,
-        });
+        })
+        .map_err(|e| e.into())
     }
 }
 

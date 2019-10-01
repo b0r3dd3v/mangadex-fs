@@ -11,9 +11,9 @@ pub enum Variant {
 
 impl Variant {
     fn get_size(&self) -> u64 {
-        match self {
-            Variant::Proxy { size } => size.clone(),
-            Variant::Ready { data } => data.len() as u64,
+        match &self {
+            Variant::Proxy { ref size } => *size,
+            Variant::Ready { ref data } => data.len() as u64,
         }
     }
 }
@@ -39,7 +39,7 @@ impl Entry for PageEntry {
 
     fn read(&self, offset: u64, size: u32) -> Result<&[u8], libc::c_int> {
         match &self.variant {
-            Variant::Ready { data } => {
+            Variant::Ready { ref data } => {
                 Ok(&data
                     [offset as usize..std::cmp::min(offset as usize + size as usize, data.len())])
             }
@@ -84,19 +84,16 @@ impl PageEntry {
         gid: GID,
     ) -> Result<PageEntry, Box<dyn Error>> {
         let response = client.head(url.as_ref()).send()?;
-
-        let now = chrono::offset::Utc::now();
-
         let headers = response.headers();
         let content_length = &headers[reqwest::header::CONTENT_LENGTH];
 
-        let size = content_length.to_str().unwrap().parse::<u64>().unwrap();
+        let size = content_length.to_str().unwrap().parse::<u64>().unwrap(); 
 
         return Ok(PageEntry {
             variant: Variant::Proxy { size },
             uid,
             gid,
-            time: time::Timespec::new(now.timestamp(), 0i32),
+            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
         });
     }
 
@@ -107,9 +104,6 @@ impl PageEntry {
         gid: GID,
     ) -> Result<PageEntry, Box<dyn Error>> {
         let mut response = client.get(url.as_ref()).send()?;
-
-        let now = chrono::offset::Utc::now();
-
         let mut data: Vec<u8> = vec![];
 
         std::io::copy(&mut response, &mut data).unwrap();
@@ -118,7 +112,7 @@ impl PageEntry {
             variant: Variant::Ready { data },
             uid,
             gid,
-            time: time::Timespec::new(now.timestamp(), 0i32),
+            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
         });
     }
 }
