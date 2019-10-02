@@ -24,12 +24,11 @@ pub enum Variant {
 }
 
 impl Hosted {
-    // Is this even idiomatic? https://www.philipdaniels.com/blog/2019/rust-api-design/
     pub fn get_page_url<S: Into<String>>(&self, page: S) -> Result<reqwest::Url, Box<dyn Error>> {
         let page = page.into();
 
         if self.pages.contains(&page) {
-            self.url.join(&page).map_err(|e| e.into())
+            self.url.join(&page).map_err(Into::into)
         }
         else {
             Err(format!("Chapter doesn't contain page\"{}\"", &page).into())
@@ -46,6 +45,7 @@ impl External {
             file: file,
         }
     }
+
     fn generate_file(url: &reqwest::Url) -> Vec<u8> {
         let content = format!(
             r#"
@@ -103,7 +103,7 @@ impl ChapterEntry {
             },
             uid,
             gid,
-        }).map_err(|e| e.into())
+        }).map_err(Into::into)
     }
 }
 

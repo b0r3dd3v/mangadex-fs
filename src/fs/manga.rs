@@ -39,10 +39,10 @@ impl MangaEntry {
         sanitize(format!("{} [{:06x}]", self.title, self.get_hash()))
     }
     
-    pub fn get<'a, I: IntoIterator<Item = &'a S> + Clone, S: AsRef<str> + 'a>(
+    pub fn get<S: AsRef<str>>(
         client: &reqwest::Client,
         id: u64,
-        languages: I,
+        languages: &[S],
         uid: UID,
         gid: GID,
     ) -> Result<MangaEntry, Box<dyn Error>> {
@@ -53,8 +53,8 @@ impl MangaEntry {
             chapters: response
                 .chapter
                 .into_iter()
-                .filter(|(_, chapter_field)| languages.clone()
-                    .into_iter()
+                .filter(|(_, chapter_field)| languages
+                    .iter()
                     .any(|language| chapter_field.lang_code == language.as_ref())
                 )
                 .map(|(chapter_id, chapter_field)| {
@@ -70,7 +70,7 @@ impl MangaEntry {
             uid: uid,
             gid: gid,
         })
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 }
 

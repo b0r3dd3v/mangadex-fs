@@ -1,5 +1,6 @@
 use chrono;
 use std::error::Error;
+use std::io::Read;
 
 use crate::fs::entry::{Entry, GID, UID};
 
@@ -103,16 +104,12 @@ impl PageEntry {
         uid: UID,
         gid: GID,
     ) -> Result<PageEntry, Box<dyn Error>> {
-        let mut response = client.get(url.as_ref()).send()?;
-        let mut data: Vec<u8> = vec![];
-
-        std::io::copy(&mut response, &mut data).unwrap();
-
-        return Ok(PageEntry {
-            variant: Variant::Ready { data },
+        client.get(url.as_ref()).send().map(|response| PageEntry {
+            variant: Variant::Ready { data: response.bytes().flatten().collect() },
             uid,
             gid,
             time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
-        });
+        })
+        .map_err(Into::into)
     }
 }
