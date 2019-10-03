@@ -26,7 +26,7 @@ pub struct ChapterResponse {
 impl ChapterResponse {
     pub fn get(client: &reqwest::Client, id: u64) -> Result<ChapterResponse, reqwest::Error> {
         client
-            .get(api::API_CHAPTER.join(&id.to_string()).unwrap())
+            .get(api::CHAPTER.join(&id.to_string()).unwrap())
             .send()?
             .json()
     }

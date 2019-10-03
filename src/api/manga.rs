@@ -37,7 +37,7 @@ pub struct MangaResponse {
 impl MangaResponse {
     pub fn get(client: &reqwest::Client, id: u64) -> Result<MangaResponse, reqwest::Error> {
         client
-            .get(api::API_MANGA.join(&id.to_string()).unwrap())
+            .get(api::MANGA.join(&id.to_string()).unwrap())
             .send()?
             .json()
     }

@@ -47,6 +47,8 @@ impl MangaDexFS {
     }
 
     pub fn add_manga(&mut self, id: u64) -> Result<(), Box<dyn Error>> {
+        info!("Adding manga of id {}", id);
+
         MangaEntry::get(&self.client, id, &self.languages, self.uid, self.gid)
             .map(|manga| {
                 self.manga.insert(id, manga);

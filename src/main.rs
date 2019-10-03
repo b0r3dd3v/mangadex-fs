@@ -19,11 +19,11 @@ fn main() {
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(
             clap::Arg::with_name("path")
-                .short("p")
-                .long("path")
+                .index(1)
                 .takes_value(true)
+                .value_name("mount path")
                 .required(true)
-                .help("Sets the target directory of the mount"),
+                .help("Sets the target directory of the mount."),
         )
         .arg(
             clap::Arg::with_name("manga")
@@ -33,20 +33,39 @@ fn main() {
                 .takes_value(true)
                 .required(false)
                 .multiple(true)
-                .help("Mounts corresponding manga")
+                .help("Mounts corresponding manga by id.")
                 .validator(|m| match m.parse::<u64>() {
                     Err(e) => Err(e.to_string()),
                     _ => Ok(()),
                 }),
         )
         .arg(
-            clap::Arg::with_name("mdlist")
-                .short("l")
-                .long("mdlist")
-                .value_name("mdlist id")
+            clap::Arg::with_name("manga-by-title")
+                .short("t")
+                .long("title")
+                .value_name("manga title")
                 .takes_value(true)
                 .required(false)
-                .help("Reads a public mdlist to fetch chapters")
+                .multiple(true)
+                .help("Tries to find manga by title, requires --login.")
+                .requires("login")
+        )
+        .arg(
+            clap::Arg::with_name("exact")
+                .short("e")
+                .long("exact")
+                .help("Matches found manga by title. If not set and exact match is not found, defaults to the first match.")
+                .takes_value(false)
+                .requires("manga-by-title")
+        )
+        .arg(
+            clap::Arg::with_name("mdlist")
+                .long("mdlist")
+                .short("d")
+                .value_name("user id")
+                .takes_value(true)
+                .required(false)
+                .help("Reads a public mdlist to fetch chapters.")
                 .validator(|m| match m.parse::<u64>() {
                     Err(e) => Err(e.to_string()),
                     _ => Ok(()),
@@ -60,7 +79,7 @@ fn main() {
                 .takes_value(true)
                 .required(false)
                 .default_value("1")
-                .help("Run FUSE with specified number of threads")
+                .help("Run FUSE with specified number of threads.")
                 .validator(|m| match m.parse::<usize>() {
                     Err(e) => Err(e.to_string()),
                     Ok(n) => {
@@ -81,15 +100,77 @@ fn main() {
                 .required(false)
                 .multiple(true)
                 .default_value("gb")
-                .help("Sets language of fetched chapters, ignores the rest"),
+                .help("Sets language of fetched chapters, ignores the rest."),
+        )
+        .arg(
+            clap::Arg::with_name("login")
+                .long("login")
+                .takes_value(false)
+                .help("Login with your username and password to enable some additional functionality.")
         )
         .get_matches();
 
     let client = reqwest::Client::new();
+
+    let session = if cli.is_present("login") {
+        use std::io::Write;
+
+        let mut session = Err("Login not successful.");
+        let mut attempts = 0;
+
+        while attempts < 3 && session.is_err() {
+            let mut login = "".to_owned();
+
+            println!("Logging in");
+            print!("Username: ");
+            std::io::stdout().flush().unwrap();
+            std::io::stdin().read_line(&mut login).unwrap();
+
+            let password = rpassword::prompt_password_stdout("Password: ").unwrap();
+
+            match api::MangadexSession::login(&client, login, password) {
+                Ok(attempt) => session = Ok(attempt),
+                Err(e) => {
+                    println!("Error: {}", e);
+                    attempts = attempts + 1;
+                }
+            }
+        }
+
+        if session.is_err() {
+            println!("Too many attempts, exiting...");
+            std::process::exit(1);
+        } else {
+            println!("Logged in successfully!");
+        }
+
+        session
+    } else {
+        Err("Not logged in, try --login flag.".into())
+    };
+
     let mdlist: Option<Vec<u64>> = cli
         .value_of("mdlist")
         .and_then(|id| api::MDList::scrap(&client, id.parse::<u64>().unwrap()).ok())
         .map(|mdlist| mdlist.entries.into_iter().map(|e| e.id).collect());
+
+    let bytitle: Option<Vec<u64>> = cli
+        .values_of("manga-by-title")
+        .and_then(|titles| {
+            titles
+                .into_iter()
+                .map(|title| {
+                    api::MangaByTitle::scrap(
+                        &client,
+                        &session.as_ref().unwrap(),
+                        title,
+                        cli.is_present("exact"),
+                    )
+                    .ok()
+                })
+                .collect()
+        })
+        .map(|found: Vec<api::MangaByTitle>| found.into_iter().map(|m| m.0).collect());
 
     let mut mangadex = fs::MangaDexFS::new(client);
 
@@ -113,6 +194,15 @@ fn main() {
 
     if let Some(mdlist) = mdlist {
         for id in mdlist {
+            #[allow(unused_must_use)]
+            {
+                mangadex.add_manga(id);
+            }
+        }
+    }
+
+    if let Some(bytitle) = bytitle {
+        for id in bytitle {
             #[allow(unused_must_use)]
             {
                 mangadex.add_manga(id);
