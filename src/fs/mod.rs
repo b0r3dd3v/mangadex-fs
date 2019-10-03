@@ -29,26 +29,23 @@ pub struct MangaDexFS {
 }
 
 impl MangaDexFS {
-    pub fn new() -> MangaDexFS {
+    pub fn new(client: reqwest::Client) -> MangaDexFS {
         MangaDexFS {
-            client: reqwest::Client::new(),
+            client,
             manga: HashMap::new(),
             chapters: Arc::new(Mutex::new(HashMap::new())),
             pages: Arc::new(Mutex::new(HashMap::new())),
             uid: UID(nix::unistd::Uid::current().as_raw() as u32),
             gid: GID(nix::unistd::Gid::current().as_raw() as u32),
             languages: vec![],
-            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32)
+            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
         }
     }
 
     pub fn add_language<S: Into<String>>(&mut self, lang: S) {
-        let lang = lang.into();
-
-        info!("Adding language: {}", &lang);
-        self.languages.push(lang);
+        self.languages.push(lang.into());
     }
-    
+
     pub fn add_manga(&mut self, id: u64) -> Result<(), Box<dyn Error>> {
         MangaEntry::get(&self.client, id, &self.languages, self.uid, self.gid)
             .map(|manga| {
@@ -114,7 +111,10 @@ impl MangaDexFS {
 
     fn get_manga<P: AsRef<Path>>(&self, path: P) -> Option<MangaEntry> {
         MangaDexFS::get_nth_child(&path, 2).and_then(|title| {
-            self.manga.values().find(|manga| manga.format() == title).map(Clone::clone)
+            self.manga
+                .values()
+                .find(|manga| manga.format() == title)
+                .map(Clone::clone)
         })
     }
 
@@ -275,12 +275,16 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
         }
 
         let entries_found = match level {
-            1 => self.manga.iter().map(|(_, manga)| {
-                Ok(fuse_mt::DirectoryEntry {
-                    name: std::ffi::OsString::from(manga.format()),
-                    kind: fuse::FileType::Directory,
+            1 => self
+                .manga
+                .iter()
+                .map(|(_, manga)| {
+                    Ok(fuse_mt::DirectoryEntry {
+                        name: std::ffi::OsString::from(manga.format()),
+                        kind: fuse::FileType::Directory,
+                    })
                 })
-            }).collect(),
+                .collect(),
             2 => self
                 .get_manga(&path)
                 .map(|manga| manga.get_entries())
@@ -288,15 +292,15 @@ impl fuse_mt::FilesystemMT for MangaDexFS {
             3 => self
                 .get_or_fetch_chapter(&path)
                 .map(|chapter| chapter.get_entries()),
-            _ => Ok(vec![])
+            _ => Ok(vec![]),
         };
-        
+
         match entries_found {
             Ok(found) => {
                 for entry in found {
                     entries.push(entry);
                 }
-            },
+            }
             Err(e) => {
                 warn!("readdir of path \"{:?}\": {}", path, e);
             }

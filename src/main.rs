@@ -40,6 +40,19 @@ fn main() {
                 }),
         )
         .arg(
+            clap::Arg::with_name("mdlist")
+                .short("l")
+                .long("mdlist")
+                .value_name("mdlist id")
+                .takes_value(true)
+                .required(false)
+                .help("Reads a public mdlist to fetch chapters")
+                .validator(|m| match m.parse::<u64>() {
+                    Err(e) => Err(e.to_string()),
+                    _ => Ok(()),
+                }),
+        )
+        .arg(
             clap::Arg::with_name("threads")
                 .short("j")
                 .long("threads")
@@ -72,15 +85,38 @@ fn main() {
         )
         .get_matches();
 
-    let mut mangadex = fs::MangaDexFS::new();
+    let client = reqwest::Client::new();
+    let mdlist: Option<Vec<u64>> = cli
+        .value_of("mdlist")
+        .and_then(|id| api::MDList::scrap(&client, id.parse::<u64>().unwrap()).ok())
+        .map(|mdlist| mdlist.entries.into_iter().map(|e| e.id).collect());
 
-    for lang in cli.values_of("language").unwrap() {
-        mangadex.add_language(lang);
+    let mut mangadex = fs::MangaDexFS::new(client);
+
+    if let Some(langs) = cli.values_of("language") {
+        for lang in langs {
+            #[allow(unused_must_use)]
+            {
+                mangadex.add_language(lang);
+            }
+        }
     }
 
-    for id in cli.values_of("manga").unwrap() {
-        #[allow(unused_must_use)] {
-            mangadex.add_manga(id.parse::<u64>().unwrap());
+    if let Some(manga) = cli.values_of("manga") {
+        for id in manga {
+            #[allow(unused_must_use)]
+            {
+                mangadex.add_manga(id.parse::<u64>().unwrap());
+            }
+        }
+    }
+
+    if let Some(mdlist) = mdlist {
+        for id in mdlist {
+            #[allow(unused_must_use)]
+            {
+                mangadex.add_manga(id);
+            }
         }
     }
 

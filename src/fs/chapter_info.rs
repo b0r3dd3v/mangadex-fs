@@ -30,24 +30,11 @@ impl ChapterInfo {
 
         match (self.title.is_empty(), self.volume.is_empty()) {
             (true, true) => sanitize(format!("{} [{:06x}]", self.chapter, hash)),
-            (true, false) => sanitize(format!(
-                "{}.{} [{:06x}]",
-                self.volume,
-                self.chapter,
-                hash
-            )),
-            (false, true) => sanitize(format!(
-                "{} {} [{:06x}]",
-                self.chapter,
-                self.title,
-                hash
-            )),
+            (true, false) => sanitize(format!("{}.{} [{:06x}]", self.volume, self.chapter, hash)),
+            (false, true) => sanitize(format!("{} {} [{:06x}]", self.chapter, self.title, hash)),
             _ => sanitize(format!(
                 "{}.{} {} [{:06x}]",
-                self.volume,
-                self.chapter,
-                self.title,
-                hash
+                self.volume, self.chapter, self.title, hash
             )),
         }
     }

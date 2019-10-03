@@ -6,8 +6,8 @@ use crate::fs::entry::{Entry, GID, UID};
 
 use sanitize_filename::sanitize;
 use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::error::Error;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone)]
 pub struct MangaEntry {
@@ -38,7 +38,7 @@ impl MangaEntry {
     pub fn format(&self) -> String {
         sanitize(format!("{} [{:06x}]", self.title, self.get_hash()))
     }
-    
+
     pub fn get<S: AsRef<str>>(
         client: &reqwest::Client,
         id: u64,
@@ -46,31 +46,33 @@ impl MangaEntry {
         uid: UID,
         gid: GID,
     ) -> Result<MangaEntry, Box<dyn Error>> {
-        api::MangaResponse::get(&client, id).map(|response| MangaEntry {
-            id: id,
-            title: response.manga.title,
-            cover: api::BASE.join(&response.manga.cover_url).unwrap(),
-            chapters: response
-                .chapter
-                .into_iter()
-                .filter(|(_, chapter_field)| languages
-                    .iter()
-                    .any(|language| chapter_field.lang_code == language.as_ref())
-                )
-                .map(|(chapter_id, chapter_field)| {
-                    ChapterInfo {
+        api::MangaResponse::get(&client, id)
+            .map(|response| MangaEntry {
+                id: id,
+                title: htmlescape::decode_html(&response.manga.title)
+                    .unwrap_or(response.manga.title),
+                cover: api::BASE.join(&response.manga.cover_url).unwrap(),
+                chapters: response
+                    .chapter
+                    .into_iter()
+                    .filter(|(_, chapter_field)| {
+                        languages
+                            .iter()
+                            .any(|language| chapter_field.lang_code == language.as_ref())
+                    })
+                    .map(|(chapter_id, chapter_field)| ChapterInfo {
                         id: chapter_id,
                         chapter: chapter_field.chapter,
                         volume: chapter_field.volume,
-                        title: chapter_field.title,
-                    }
-                })
-                .collect(),
-            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
-            uid: uid,
-            gid: gid,
-        })
-        .map_err(Into::into)
+                        title: htmlescape::decode_html(&chapter_field.title)
+                            .unwrap_or(chapter_field.title),
+                    })
+                    .collect(),
+                time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
+                uid: uid,
+                gid: gid,
+            })
+            .map_err(Into::into)
     }
 }
 

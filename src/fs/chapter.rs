@@ -29,8 +29,7 @@ impl Hosted {
 
         if self.pages.contains(&page) {
             self.url.join(&page).map_err(Into::into)
-        }
-        else {
+        } else {
             Err(format!("Chapter doesn't contain page\"{}\"", &page).into())
         }
     }
@@ -80,30 +79,32 @@ impl ChapterEntry {
         uid: UID,
         gid: GID,
     ) -> Result<ChapterEntry, Box<dyn Error>> {
-        api::ChapterResponse::get(&client, id).map(|response| ChapterEntry {
-            info: ChapterInfo {
-                id,
-                chapter: response.chapter,
-                volume: response.volume,
-                title: response.title,
-            },
-            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
-            variant: match response.external {
-                Some(external) => {
-                    Variant::External(External::new(reqwest::Url::parse(&external).unwrap()))
-                }
-                None => Variant::Hosted(Hosted {
-                    url: reqwest::Url::parse(&response.server)
-                        .or(api::BASE.join(&response.server))
-                        .unwrap()
-                        .join(&format!("{}/", response.hash))
-                        .unwrap(),
-                    pages: response.page_array,
-                }),
-            },
-            uid,
-            gid,
-        }).map_err(Into::into)
+        api::ChapterResponse::get(&client, id)
+            .map(|response| ChapterEntry {
+                info: ChapterInfo {
+                    id,
+                    chapter: response.chapter,
+                    volume: response.volume,
+                    title: htmlescape::decode_html(&response.title).unwrap_or(response.title),
+                },
+                time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
+                variant: match response.external {
+                    Some(external) => {
+                        Variant::External(External::new(reqwest::Url::parse(&external).unwrap()))
+                    }
+                    None => Variant::Hosted(Hosted {
+                        url: reqwest::Url::parse(&response.server)
+                            .or(api::BASE.join(&response.server))
+                            .unwrap()
+                            .join(&format!("{}/", response.hash))
+                            .unwrap(),
+                        pages: response.page_array,
+                    }),
+                },
+                uid,
+                gid,
+            })
+            .map_err(Into::into)
     }
 }
 

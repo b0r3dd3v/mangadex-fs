@@ -88,7 +88,7 @@ impl PageEntry {
         let headers = response.headers();
         let content_length = &headers[reqwest::header::CONTENT_LENGTH];
 
-        let size = content_length.to_str().unwrap().parse::<u64>().unwrap(); 
+        let size = content_length.to_str().unwrap().parse::<u64>().unwrap();
 
         return Ok(PageEntry {
             variant: Variant::Proxy { size },
@@ -104,12 +104,17 @@ impl PageEntry {
         uid: UID,
         gid: GID,
     ) -> Result<PageEntry, Box<dyn Error>> {
-        client.get(url.as_ref()).send().map(|response| PageEntry {
-            variant: Variant::Ready { data: response.bytes().flatten().collect() },
-            uid,
-            gid,
-            time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
-        })
-        .map_err(Into::into)
+        client
+            .get(url.as_ref())
+            .send()
+            .map(|response| PageEntry {
+                variant: Variant::Ready {
+                    data: response.bytes().flatten().collect(),
+                },
+                uid,
+                gid,
+                time: time::Timespec::new(chrono::offset::Utc::now().timestamp(), 0i32),
+            })
+            .map_err(Into::into)
     }
 }
