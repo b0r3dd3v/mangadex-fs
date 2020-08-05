@@ -70,17 +70,22 @@ impl Client {
         }
     }
 
-    pub async fn add_manga(&mut self, manga_id: u64) -> ClientResult<String> {
+    pub async fn add_manga(&mut self, manga_id: u64) -> ClientResult<mangadex_fs::GetOrFetch<String>> {
         self.stream.write_u8(ipc::ADD_MANGA).await.map_err(ClientError::IO)?;
         self.stream.write_u64(manga_id).await.map_err(ClientError::IO)?;
         self.stream.flush().await.map_err(ClientError::IO)?;
 
         match self.read_response().await? {
             ipc::ADD_MANGA_RESULT => match self.read_response().await? {
-                ipc::ADD_MANGA_RESULT_OK => {
+                ipc::ADD_MANGA_RESULT_OK_CACHE => {
                     let title = ipc::read_string(&mut self.stream).await.map_err(ClientError::IO)?;
 
-                    Ok(title)
+                    Ok(mangadex_fs::GetOrFetch::Cached(title))
+                },
+                ipc::ADD_MANGA_RESULT_OK_FETCH => {
+                    let title = ipc::read_string(&mut self.stream).await.map_err(ClientError::IO)?;
+
+                    Ok(mangadex_fs::GetOrFetch::Fetched(title))
                 },
                 ipc::ADD_MANGA_RESULT_ERROR_REQUEST => Err(ClientError::Message("request error".into())),
                 _ => Err(ClientError::Message("invalid daemon response".into()))
@@ -89,14 +94,15 @@ impl Client {
         }
     }
 
-    pub async fn add_chapter(&mut self, chapter_id: u64) -> ClientResult<()> {
+    pub async fn add_chapter(&mut self, chapter_id: u64) -> ClientResult<mangadex_fs::GetOrFetch<()>> {
         self.stream.write_u8(ipc::ADD_CHAPTER).await.map_err(ClientError::IO)?;
         self.stream.write_u64(chapter_id).await.map_err(ClientError::IO)?;
         self.stream.flush().await.map_err(ClientError::IO)?;
         
         match self.read_response().await? {
             ipc::ADD_CHAPTER_RESULT => match self.read_response().await? {
-                ipc::ADD_CHAPTER_RESULT_OK => Ok(()),
+                ipc::ADD_CHAPTER_RESULT_OK_CACHE => Ok(mangadex_fs::GetOrFetch::Cached(())),
+                ipc::ADD_CHAPTER_RESULT_OK_FETCH => Ok(mangadex_fs::GetOrFetch::Fetched(())),
                 ipc::ADD_CHAPTER_RESULT_ERROR_REQUEST => Err(ClientError::Message("request error".into())),
                 _ => Err(ClientError::Message("invalid daemon response".into()))
             },

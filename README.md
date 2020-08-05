@@ -8,4 +8,4 @@ This is a basic implementation of FUSE driver utilising [MangaDex](https://manga
 
 ## Version 0.2.0-alpha
 
-Not yet working.
+Not yet working. Checkout [previous version](https://github.com/bittersweetshimmer/mangadex-fs/tree/v0.1.5).

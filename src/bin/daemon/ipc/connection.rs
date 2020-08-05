@@ -5,7 +5,7 @@ use tokio::io::AsyncWriteExt;
 
 pub struct Connection {
     stream: tokio::net::UnixStream,
-    api: std::sync::Arc<tokio::sync::Mutex<api::MangaDexAPI>>
+    context: std::sync::Arc<tokio::sync::Mutex<mangadex_fs::Context>>
 }
 
 pub enum ConnectionError<E> {
@@ -16,24 +16,24 @@ pub enum ConnectionError<E> {
 pub type ConnectionResult<R, E> = Result<R, ConnectionError<E>>;
 
 impl Connection {
-    pub fn new(stream: tokio::net::UnixStream, api: std::sync::Arc<tokio::sync::Mutex<api::MangaDexAPI>>) -> Connection {
-        Connection {
-            stream: stream,
-            api: api
-        }
+    pub fn new(
+        stream: tokio::net::UnixStream,
+        context: std::sync::Arc<tokio::sync::Mutex<mangadex_fs::Context>>
+    ) -> Connection {
+        Connection { stream, context }
     }
 
     pub async fn read_command(&mut self) -> std::io::Result<ipc::SubCommand> {
         self.stream.read_u8().await
     }
 
-    pub async fn log_in(&mut self) -> ConnectionResult<(), api::LogInError> {
+    pub async fn log_in(&mut self) -> ConnectionResult<api::MangaDexSession, api::LogInError> {
         let username = ipc::read_string(&mut self.stream).await.map_err(ConnectionError::IO)?;
         let password = ipc::read_string(&mut self.stream).await.map_err(ConnectionError::IO)?;
 
         debug!("attempting to log in with username \"{}\"...", username);
 
-        match self.api.lock().await.log_in(username.clone(), password).await {
+        match self.context.lock().await.log_in(username.clone(), password).await {
             Ok(session) => {
                 info!("logged in successfully as {}", username);
                 debug!("session id: {}", session.id);
@@ -42,7 +42,7 @@ impl Connection {
                 self.stream.write_u8(ipc::LOG_IN_RESULT_OK).await.map_err(ConnectionError::IO)?;
                 self.stream.flush().await.map_err(ConnectionError::IO)?;
 
-                Ok(())
+                Ok(session)
             },
             Err(error) => {
                 error!("log in error: {:?}", error);
@@ -71,7 +71,7 @@ impl Connection {
     pub async fn log_out(&mut self) -> ConnectionResult<(), api::LogOutError> {
         debug!("attempting to log out...");
 
-        match self.api.lock().await.log_out().await {
+        match self.context.lock().await.log_out().await {
             Ok(_) => {
                 info!("logged out successfully");
 
@@ -107,19 +107,29 @@ impl Connection {
     pub async fn add_manga(&mut self) -> ConnectionResult<(), api::AddMangaError> {
         let manga_id = self.stream.read_u64().await.map_err(ConnectionError::IO)?;
 
-        match self.api.lock().await.get_manga(manga_id).await {
-            Ok(manga) => {
-                info!("added manga: id: {}, title: {}", manga_id, manga.manga.title);
+        match self.context.lock().await.get_or_fetch_manga(manga_id).await {
+            Ok(mangadex_fs::GetOrFetch::Cached(title)) => {
+                info!("cached manga: id: {}, title: {}", manga_id, title);
 
                 self.stream.write_u8(ipc::ADD_MANGA_RESULT).await.map_err(ConnectionError::IO)?;
-                self.stream.write_u8(ipc::ADD_MANGA_RESULT_OK).await.map_err(ConnectionError::IO)?;
-                ipc::write_string(&mut self.stream, &manga.manga.title).await.map_err(ConnectionError::IO)?;
+                self.stream.write_u8(ipc::ADD_MANGA_RESULT_OK_CACHE).await.map_err(ConnectionError::IO)?;
+                ipc::write_string(&mut self.stream, &title).await.map_err(ConnectionError::IO)?;
+                self.stream.flush().await.map_err(ConnectionError::IO)?;
+
+                Ok(())
+            },
+            Ok(mangadex_fs::GetOrFetch::Fetched(title)) => {
+                info!("fetched manga: id: {}, title: {}", manga_id, title);
+
+                self.stream.write_u8(ipc::ADD_MANGA_RESULT).await.map_err(ConnectionError::IO)?;
+                self.stream.write_u8(ipc::ADD_MANGA_RESULT_OK_FETCH).await.map_err(ConnectionError::IO)?;
+                ipc::write_string(&mut self.stream, &title).await.map_err(ConnectionError::IO)?;
                 self.stream.flush().await.map_err(ConnectionError::IO)?;
 
                 Ok(())
             },
             Err(error) => {
-                error!("add manga error: {}", error);
+                error!("add manga API error: {}", error);
 
                 self.stream.write_u8(ipc::ADD_MANGA_RESULT).await.map_err(ConnectionError::IO)?;
                 self.stream.write_u8(ipc::ADD_MANGA_RESULT_ERROR_REQUEST).await.map_err(ConnectionError::IO)?;
@@ -127,24 +137,33 @@ impl Connection {
 
                 Err(ConnectionError::API(error))
             }
-        }
+        }    
     }
 
     pub async fn add_chapter(&mut self) -> ConnectionResult<(), api::AddChapterError> {
         let chapter_id = self.stream.read_u64().await.map_err(ConnectionError::IO)?;
 
-        match self.api.lock().await.get_chapter(chapter_id).await {
-            Ok(chapter) => {
-                info!("added chapter: id: {}, manga_id: {}", chapter.id, chapter.manga_id);
-                
+        match self.context.lock().await.get_or_fetch_chapter(chapter_id).await {
+            Ok(mangadex_fs::GetOrFetch::Cached(_)) => {
+                info!("cached chapter: id: {}", chapter_id);
+
                 self.stream.write_u8(ipc::ADD_CHAPTER_RESULT).await.map_err(ConnectionError::IO)?;
-                self.stream.write_u8(ipc::ADD_CHAPTER_RESULT_OK).await.map_err(ConnectionError::IO)?;
+                self.stream.write_u8(ipc::ADD_CHAPTER_RESULT_OK_CACHE).await.map_err(ConnectionError::IO)?;
+                self.stream.flush().await.map_err(ConnectionError::IO)?;
+
+                Ok(())
+            },
+            Ok(mangadex_fs::GetOrFetch::Fetched(_)) => {
+                info!("fetched chaper: id: {}", chapter_id);
+
+                self.stream.write_u8(ipc::ADD_CHAPTER_RESULT).await.map_err(ConnectionError::IO)?;
+                self.stream.write_u8(ipc::ADD_CHAPTER_RESULT_OK_FETCH).await.map_err(ConnectionError::IO)?;
                 self.stream.flush().await.map_err(ConnectionError::IO)?;
 
                 Ok(())
             },
             Err(error) => {
-                error!("add chapter error: {}", error);
+                error!("add manga API error: {}", error);
 
                 self.stream.write_u8(ipc::ADD_CHAPTER_RESULT).await.map_err(ConnectionError::IO)?;
                 self.stream.write_u8(ipc::ADD_CHAPTER_RESULT_ERROR_REQUEST).await.map_err(ConnectionError::IO)?;
@@ -152,13 +171,13 @@ impl Connection {
 
                 Err(ConnectionError::API(error))
             }
-        }
+        }    
     }
 
-    pub async fn quick_search(&mut self) -> ConnectionResult<(), api::QuickSearchError> {
+    pub async fn quick_search(&mut self) -> ConnectionResult<Vec<api::QuickSearchEntry>, api::QuickSearchError> {
         let query = ipc::read_string(&mut self.stream).await.map_err(ConnectionError::IO)?;
 
-        match self.api.lock().await.quick_search(&query).await {
+        match self.context.lock().await.quick_search(&query).await {
             Ok(results) => {
                 info!("found {} results for quick search query \"{}\"", results.len(), query);
 
@@ -166,14 +185,14 @@ impl Connection {
                 self.stream.write_u8(ipc::QUICK_SEARCH_RESULT_OK).await.map_err(ConnectionError::IO)?;
                 self.stream.write_u64(results.len() as u64).await.map_err(ConnectionError::IO)?;
 
-                for result in results {
+                for result in &results {
                     self.stream.write_u64(result.id).await.map_err(ConnectionError::IO)?;
-                    ipc::write_string(&mut self.stream, result.title).await.map_err(ConnectionError::IO)?;
+                    ipc::write_string(&mut self.stream, &result.title).await.map_err(ConnectionError::IO)?;
                 }
 
                 self.stream.flush().await.map_err(ConnectionError::IO)?;
 
-                Ok(())
+                Ok(results)
             },
             Err(error) => {
                 error!("quick search error: {:?}", error);

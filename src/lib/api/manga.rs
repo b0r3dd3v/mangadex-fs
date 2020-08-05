@@ -25,7 +25,7 @@ where
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct MangaDetails {
+pub struct MangaField {
     pub title: String,
     pub cover_url: String,
     pub lang_name: String,
@@ -52,7 +52,7 @@ pub struct ChapterField {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Manga {
-    pub manga: MangaDetails,
+    pub manga: MangaField,
     pub chapter: std::collections::HashMap<u64, ChapterField>
 }
 

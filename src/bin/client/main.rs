@@ -47,10 +47,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 else { println!("No results found."); }
             }),
             ("add", Some(add_args)) => match add_args.subcommand() {
-                ("manga", Some(manga_args)) => client.add_manga(manga_args.value_of("manga_id").unwrap().parse::<u64>().unwrap()).await.map(|title| {
-                    println!("Manga \"{}\" has been added successfully.", title);
+                ("manga", Some(manga_args)) => client.add_manga(manga_args.value_of("manga_id").unwrap().parse::<u64>().unwrap()).await.map(|result| {
+                    match result {
+                        mangadex_fs::GetOrFetch::Cached(title) => println!("Manga \"{}\" was already added.", title),
+                        mangadex_fs::GetOrFetch::Fetched(title) => println!("Manga \"{}\" has been added successfully.", title),
+                    }
                 }),
-                ("chapter", Some(chapter_args)) => client.add_chapter(chapter_args.value_of("chapter_id").unwrap().parse::<u64>().unwrap()).await,
+                ("chapter", Some(chapter_args)) => client.add_chapter(chapter_args.value_of("chapter_id").unwrap().parse::<u64>().unwrap()).await.map(|result| {
+                    match result {
+                        mangadex_fs::GetOrFetch::Cached(_) => println!("Chapter was already added."),
+                        mangadex_fs::GetOrFetch::Fetched(_) => println!("Chapter has been added successfully."),
+                    }
+                }),
                 (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"add {}\"", command)))
             },
             (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"{}\"", command)))

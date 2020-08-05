@@ -1,11 +1,5 @@
 use crate::api;
 
-#[derive(Default)]
-struct CachedRequests {
-    manga: std::collections::HashMap<u64, api::Manga>,
-    chapters: std::collections::HashMap<u64, api::Chapter>
-}
-
 #[derive(Debug)]
 pub enum QuickSearchError {
     Request(reqwest::Error),
@@ -14,19 +8,19 @@ pub enum QuickSearchError {
 
 pub struct MangaDexAPI {
     client: reqwest::Client,
-    session: Option<api::MangaDexSession>,
-    cached: CachedRequests
+    session: Option<api::MangaDexSession>
 }
 
 pub type AddMangaError = reqwest::Error;
 pub type AddChapterError = reqwest::Error;
+pub type AddProxyPageError = reqwest::Error;
+pub type AddPageError = reqwest::Error;
 
 impl MangaDexAPI {
     pub fn new() -> MangaDexAPI {
         MangaDexAPI {
             client: reqwest::Client::new(),
-            session: None,
-            cached: CachedRequests::default()
+            session: None
         }
     }
 
@@ -60,26 +54,20 @@ impl MangaDexAPI {
         }
     }
 
-    pub async fn get_manga(&mut self, id: u64) -> Result<&api::Manga, AddMangaError> {
-        if !self.cached.manga.contains_key(&id) {
-            match api::Manga::get(&self.client, id).await {
-                Ok(manga) => { self.cached.manga.insert(id, manga); },
-                Err(error) => return Err(error)
-            }
-        }
-
-        Ok(self.cached.manga.get(&id).unwrap())
+    pub async fn get_manga(&mut self, id: u64) -> Result<api::Manga, AddMangaError> {
+        api::Manga::get(&self.client, id).await
     }
 
-    pub async fn get_chapter(&mut self, id: u64) -> Result<&api::Chapter, AddChapterError> {
-        if !self.cached.chapters.contains_key(&id) {
-            match api::Chapter::get(&self.client, id).await {
-                Ok(chapter) => { self.cached.chapters.insert(id, chapter); },
-                Err(error) => return Err(error)
-            }
-        }
+    pub async fn get_chapter(&mut self, id: u64) -> Result<api::Chapter, AddChapterError> {
+        api::Chapter::get(&self.client, id).await
+    }
 
-        Ok(self.cached.chapters.get(&id).unwrap())
+    pub async fn get_proxy_page(&mut self, url: &reqwest::Url) -> Result<api::PageProxy, AddChapterError> {
+        api::PageProxy::get(&self.client, url).await
+    }
+
+    pub async fn get_page(&mut self, url: &reqwest::Url) -> Result<api::Page, AddChapterError> {
+        api::Page::get(&self.client, url).await
     }
 
     pub async fn quick_search<S: AsRef<str>>(&self, query: S) -> Result<Vec<api::QuickSearchEntry>, api::QuickSearchError> {
