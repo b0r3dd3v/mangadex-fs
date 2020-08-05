@@ -1,6 +1,6 @@
 [package]
 name = "mangadex-fs"
-version = "0.1.5"
+version = "0.2.0-alpha.0"
 authors = ["bittersweetshimmer"]
 edition = "2018"
 repository = "https://github.com/bittersweetshimmer/mangadex-fs"
@@ -13,20 +13,27 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fuse = "0.3.1"
-reqwest = "0.9.20"
-serde = "1.0.101"
-lazy_static = "1.4.0"
-libc = "0.2.5"
-time = "0.1.42"
-fuse_mt = "0.5.0"
-nix = "0.15.0"
-chrono = "0.4.9"
-clap = "2.33.0"
-env_logger = "0.7"
+reqwest = { version = "0.10", features = ["json"] }
+scraper = "0.12"
+cookie = "0.14"
+tokio = { version = "0.2", features = ["macros", "uds", "io-util", "fs", "rt-core", "signal", "macros", "sync"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_repr = "0.1"
+clap = "2.33"
 log = "0.4"
-sanitize-filename = "0.2.1"
-scraper = "0.11.0"
-htmlescape = "0.3.1"
-cookie = "0.12.0"
-rpassword = "4.0"
+env_logger = "0.7"
+colored = "2.0"
+directories = "3.0"
+toml = "0.5"
+
+[lib]
+name = "mangadex_fs"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "mangadex-fsd"
+path = "src/bin/daemon/main.rs"
+
+[[bin]]
+name = "mangadex-fsc"
+path = "src/bin/client/main.rs"
