@@ -87,6 +87,7 @@ impl Client {
 
                     Ok(mangadex_fs::GetOrFetch::Fetched(title))
                 },
+                ipc::ADD_MANGA_RESULT_ERROR_DROPPED => Err(ClientError::Message("pointer dropped".into())),
                 ipc::ADD_MANGA_RESULT_ERROR_REQUEST => Err(ClientError::Message("request error".into())),
                 _ => Err(ClientError::Message("invalid daemon response".into()))
             },
@@ -103,6 +104,7 @@ impl Client {
             ipc::ADD_CHAPTER_RESULT => match self.read_response().await? {
                 ipc::ADD_CHAPTER_RESULT_OK_CACHE => Ok(mangadex_fs::GetOrFetch::Cached(())),
                 ipc::ADD_CHAPTER_RESULT_OK_FETCH => Ok(mangadex_fs::GetOrFetch::Fetched(())),
+                ipc::ADD_CHAPTER_RESULT_ERROR_DROPPED => Err(ClientError::Message("pointer dropped".into())),
                 ipc::ADD_CHAPTER_RESULT_ERROR_REQUEST => Err(ClientError::Message("request error".into())),
                 _ => Err(ClientError::Message("invalid daemon response".into()))
             },

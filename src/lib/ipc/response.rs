@@ -21,11 +21,13 @@ pub type AddMangaResult = u8;
 pub const ADD_MANGA_RESULT_OK_CACHE: AddMangaResult = 0u8;
 pub const ADD_MANGA_RESULT_OK_FETCH: AddMangaResult = 1u8;
 pub const ADD_MANGA_RESULT_ERROR_REQUEST: AddMangaResult = 2u8;
+pub const ADD_MANGA_RESULT_ERROR_DROPPED: AddMangaResult = 3u8;
 
 pub type AddChapterResult = u8;
 pub const ADD_CHAPTER_RESULT_OK_CACHE: AddChapterResult = 0u8;
 pub const ADD_CHAPTER_RESULT_OK_FETCH: AddChapterResult = 1u8;
 pub const ADD_CHAPTER_RESULT_ERROR_REQUEST: AddChapterResult = 2u8;
+pub const ADD_CHAPTER_RESULT_ERROR_DROPPED: AddMangaResult = 3u8;
 
 pub type QuickSearchResult = u8;
 pub const QUICK_SEARCH_RESULT_OK: QuickSearchResult = 0u8; 

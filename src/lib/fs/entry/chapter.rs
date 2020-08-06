@@ -1,4 +1,5 @@
 use crate::api;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub struct Hosted {
@@ -49,15 +50,17 @@ pub struct Chapter {
     pub chapter: String,
     pub title: String,
     pub manga_id: u64,
-    pub pages: ChapterPages,
+    pub pages: ChapterPages
+}
 
-    pub time: time::Timespec,
-    pub uid: nix::unistd::Uid,
-    pub gid: nix::unistd::Gid
+impl std::hash::Hash for Chapter {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }
 
 impl Chapter {
-    pub fn new(id: u64, time: time::Timespec, uid: nix::unistd::Uid, gid: nix::unistd::Gid, chapter_api: api::Chapter) -> Chapter {
+    pub fn new(id: u64, chapter_api: api::Chapter) -> Chapter {
         Chapter {
             id,
             volume: chapter_api.volume,
@@ -74,10 +77,25 @@ impl Chapter {
                         .unwrap(),
                     chapter_api.page_array
                 )
-            },
-            time,
-            uid,
-            gid
+            }
+        }
+    }
+
+    pub fn display(&self) -> String {
+        let hash = {
+            let mut s = std::collections::hash_map::DefaultHasher::new();
+            self.hash(&mut s);
+            s.finish()
+        };
+
+        match (self.title.is_empty(), self.volume.is_empty()) {
+            (true, true) => sanitize_filename::sanitize(format!("{} [{:06x}]", self.chapter, hash)),
+            (true, false) => sanitize_filename::sanitize(format!("{}.{} [{:06x}]", self.volume, self.chapter, hash)),
+            (false, true) => sanitize_filename::sanitize(format!("{} {} [{:06x}]", self.chapter, self.title, hash)),
+            _ => sanitize_filename::sanitize(format!(
+                "{}.{} {} [{:06x}]",
+                self.volume, self.chapter, self.title, hash
+            ))
         }
     }
 }

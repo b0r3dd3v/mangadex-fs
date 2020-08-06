@@ -50,16 +50,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
             let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
 
-            let mountpoint = cli.value_of("path").unwrap();
-            let fuse_args: Vec<&std::ffi::OsStr> = vec![&std::ffi::OsStr::new("-oallow_other"), &std::ffi::OsStr::new("-oauto_unmount")];
-            let threads = 8;
+            let mountpoint = cli.value_of("path").unwrap().to_owned();
+
+            let uid = nix::unistd::Uid::current();
+            let gid = nix::unistd::Gid::current();
 
             let context = mangadex_fs::Context::new();
-            let mangadex = mangadex_fs::MangaDexFS::new(context.clone());
+            let mangadex = mangadex_fs::MangaDexFS::new(uid, gid, context.clone());
 
-            let _fuse_handle = unsafe { 
-                fuse_mt::spawn_mount(fuse_mt::FuseMT::new(mangadex, threads), &mountpoint, &fuse_args)?
-            };
+            let polyfuse_handle = tokio::spawn(polyfuse_tokio::mount(mangadex, mountpoint, &[]));
 
             loop {
                 let mut kill_tx = kill_tx.clone();
@@ -107,6 +106,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+
+            polyfuse_handle.await?;
 
             tokio::fs::remove_file(config.socket).await?;
             info!("goodbye");

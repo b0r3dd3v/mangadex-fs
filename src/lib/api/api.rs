@@ -54,19 +54,19 @@ impl MangaDexAPI {
         }
     }
 
-    pub async fn get_manga(&mut self, id: u64) -> Result<api::Manga, AddMangaError> {
+    pub async fn get_manga(&self, id: u64) -> Result<api::Manga, AddMangaError> {
         api::Manga::get(&self.client, id).await
     }
 
-    pub async fn get_chapter(&mut self, id: u64) -> Result<api::Chapter, AddChapterError> {
+    pub async fn get_chapter(&self, id: u64) -> Result<api::Chapter, AddChapterError> {
         api::Chapter::get(&self.client, id).await
     }
 
-    pub async fn get_proxy_page(&mut self, url: &reqwest::Url) -> Result<api::PageProxy, AddChapterError> {
+    pub async fn get_proxy_page(&self, url: &reqwest::Url) -> Result<api::PageProxy, AddChapterError> {
         api::PageProxy::get(&self.client, url).await
     }
 
-    pub async fn get_page(&mut self, url: &reqwest::Url) -> Result<api::Page, AddChapterError> {
+    pub async fn get_page(&self, url: &reqwest::Url) -> Result<api::Page, AddChapterError> {
         api::Page::get(&self.client, url).await
     }
 

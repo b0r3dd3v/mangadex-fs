@@ -38,7 +38,7 @@ pub struct MangaField {
     pub last_chapter: String,
     #[serde(deserialize_with = "deserialize_hentai_flag")]
     pub hentai: bool,
-    pub links: std::collections::HashMap<String, String>,
+    pub links: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, serde::Deserialize)]
