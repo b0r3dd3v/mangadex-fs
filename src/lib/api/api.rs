@@ -1,7 +1,7 @@
 use crate::api;
 
 #[derive(Debug)]
-pub enum QuickSearchError {
+pub enum SearchError {
     Request(reqwest::Error),
     NotLoggedIn
 }
@@ -11,10 +11,9 @@ pub struct MangaDexAPI {
     session: Option<api::MangaDexSession>
 }
 
-pub type AddMangaError = reqwest::Error;
-pub type AddChapterError = reqwest::Error;
-pub type AddProxyPageError = reqwest::Error;
-pub type AddPageError = reqwest::Error;
+pub type GetMangaError = reqwest::Error;
+pub type GetChapterError = reqwest::Error;
+pub type GetPageError = reqwest::Error;
 
 impl MangaDexAPI {
     pub fn new() -> MangaDexAPI {
@@ -55,22 +54,22 @@ impl MangaDexAPI {
         }
     }
 
-    pub async fn get_manga(&self, id: u64) -> Result<api::Manga, AddMangaError> {
+    pub async fn get_manga(&self, id: u64) -> Result<api::Manga, GetMangaError> {
         api::Manga::get(&self.client, id).await
     }
 
-    pub async fn get_chapter(&self, id: u64) -> Result<api::Chapter, AddChapterError> {
+    pub async fn get_chapter(&self, id: u64) -> Result<api::Chapter, GetChapterError> {
         api::Chapter::get(&self.client, id).await
     }
 
-    pub async fn get_page(&self, chapter_id: u64, url: &reqwest::Url) -> Result<api::Page, AddChapterError> {
+    pub async fn get_page(&self, chapter_id: u64, url: &reqwest::Url) -> Result<api::Page, GetPageError> {
         api::Page::get(&self.client, chapter_id, url).await
     }
 
-    pub async fn quick_search<S: AsRef<str>>(&self, query: S) -> Result<Vec<api::QuickSearchEntry>, api::QuickSearchError> {
+    pub async fn search(&self, params: &api::SearchParams) -> Result<Vec<api::SearchEntry>, api::SearchError> {
         match &self.session {
-            Some(session) => api::quick_search(&self.client, &session, query).await.map_err(QuickSearchError::Request),
-            None => Err(QuickSearchError::NotLoggedIn)
+            Some(session) => api::search(&self.client, &session, params).await.map_err(SearchError::Request),
+            None => Err(SearchError::NotLoggedIn)
         }
     }
 }

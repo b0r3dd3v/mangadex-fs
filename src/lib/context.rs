@@ -77,7 +77,7 @@ impl Context {
         self.api.write().await.log_out().await
     }
 
-    pub async fn get_or_fetch_manga(&self, id: u64) -> Result<GetOrFetchRef<fs::entry::Manga>, api::AddMangaError> {
+    pub async fn get_or_fetch_manga(&self, id: u64, languages: Vec<String>) -> Result<GetOrFetchRef<fs::entry::Manga>, api::GetMangaError> {
         match self.manga.write().await.entry(id) {
             std::collections::hash_map::Entry::Occupied(occupied) => Ok(GetOrFetchRef::Cached(std::sync::Arc::downgrade(occupied.get()))),
             std::collections::hash_map::Entry::Vacant(vacant) => match self.api.read().await.get_manga(id).await {
@@ -88,10 +88,12 @@ impl Context {
                     
                     let mut directory = fs::entry::Directory::new(1u64);
                     for chapter in &manga.chapters {
-                        let chapter_ino: u64 = self.make_next_ino().await;
-                        directory.children.insert(chapter.display().into(), (chapter_ino, false));
-                        self.new_node(chapter_ino, fs::entry::Entry::ChapterNotFetched(chapter.id)).await;
-                        self.chapters_inodes.write().await.insert(chapter.id, chapter_ino);
+                        if languages.iter().find(|&lang| lang == &chapter.lang_code).is_some() {
+                            let chapter_ino: u64 = self.make_next_ino().await;
+                            directory.children.insert(chapter.display().into(), (chapter_ino, false));
+                            self.new_node(chapter_ino, fs::entry::Entry::ChapterNotFetched(chapter.id)).await;
+                            self.chapters_inodes.write().await.insert(chapter.id, chapter_ino);
+                        }
                     }
 
                     let manga_ref = std::sync::Arc::downgrade(&manga);
@@ -112,7 +114,7 @@ impl Context {
         }
     }
 
-    pub async fn get_or_fetch_chapter(&self, id: u64) -> Result<GetOrFetchRef<fs::entry::Chapter>, api::AddMangaError> {
+    pub async fn get_or_fetch_chapter(&self, id: u64) -> Result<GetOrFetchRef<fs::entry::Chapter>, api::GetMangaError> {
         match self.chapters.write().await.entry(id) {
             std::collections::hash_map::Entry::Occupied(occupied) => Ok(GetOrFetchRef::Cached(std::sync::Arc::downgrade(occupied.get()))),
             std::collections::hash_map::Entry::Vacant(vacant) => match self.api.read().await.get_chapter(id).await {
@@ -258,7 +260,7 @@ impl Context {
         }
     }
 
-    pub async fn get_or_fetch_page(&self, chapter_id: u64, url: &reqwest::Url) -> Result<GetOrFetchRef<fs::entry::Page>, api::AddMangaError> {
+    pub async fn get_or_fetch_page(&self, chapter_id: u64, url: &reqwest::Url) -> Result<GetOrFetchRef<fs::entry::Page>, api::GetPageError> {
         match self.pages.write().await.entry(url.clone()) {
             std::collections::hash_map::Entry::Occupied(occupied) => Ok(GetOrFetchRef::Cached(std::sync::Arc::downgrade(occupied.get()))),
             std::collections::hash_map::Entry::Vacant(vacant) => match self.api.read().await.get_page(chapter_id, &url).await {
@@ -310,7 +312,7 @@ impl Context {
         }
     }
 
-    pub async fn quick_search<S: AsRef<str>>(&self, query: S) -> Result<Vec<api::QuickSearchEntry>, api::QuickSearchError> {
-        self.api.read().await.quick_search(query).await
+    pub async fn search(&self, params: &api::SearchParams) -> Result<Vec<api::SearchEntry>, api::SearchError> {
+        self.api.read().await.search(params).await
     }
 }

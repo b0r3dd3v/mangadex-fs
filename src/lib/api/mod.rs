@@ -4,7 +4,7 @@ pub mod genre;
 pub mod manga_status;
 pub mod chapter;
 pub mod api;
-pub mod quick_search;
+pub mod search;
 pub mod user_agent;
 pub mod page;
 
@@ -14,6 +14,6 @@ pub use genre::*;
 pub use manga_status::*;
 pub use chapter::*;
 pub use api::*;
-pub use quick_search::*;
+pub use search::*;
 pub use user_agent::*;
 pub use page::*;

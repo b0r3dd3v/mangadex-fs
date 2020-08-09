@@ -1,11 +1,11 @@
 [package]
 name = "mangadex-fs"
-version = "0.2.0-beta.1"
+version = "0.2.0-beta.2"
 authors = ["bittersweetshimmer"]
 edition = "2018"
 repository = "https://github.com/bittersweetshimmer/mangadex-fs"
 description = "FUSE driver using MangaDex API."
-keywords = ["fuse", "filesystem"]
+keywords = ["fuse", "filesystem", "ipc", "api"]
 categories = ["filesystem"]
 license = "MIT"
 readme = "README.md"

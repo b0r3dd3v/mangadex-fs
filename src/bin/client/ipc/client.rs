@@ -49,8 +49,8 @@ impl Client {
         }
     }
 
-    pub async fn add_manga(&mut self, manga_id: u64) -> ClientResult<String> {
-        ipc::Command::AddManga(manga_id).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+    pub async fn add_manga(&mut self, manga_id: u64, languages: Vec<String>) -> ClientResult<String> {
+        ipc::Command::AddManga(manga_id, languages).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::AddManga(Ok(formatted))) => Ok(formatted),
@@ -59,22 +59,12 @@ impl Client {
         }
     }
 
-    pub async fn add_chapter(&mut self, chapter_id: u64) -> ClientResult<String> {
-        ipc::Command::AddChapter(chapter_id).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+    pub async fn search(&mut self, params: api::SearchParams) -> ClientResult<Vec<api::SearchEntry>> {
+        ipc::Command::Search(params).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
-            Some(ipc::Response::AddChapter(Ok(formatted))) => Ok(formatted),
-            Some(ipc::Response::AddChapter(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
-        }
-    }
-
-    pub async fn quick_search<Q: Into<String>>(&mut self, query: Q) -> ClientResult<Vec<api::QuickSearchEntry>> {
-        ipc::Command::QuickSearch(query.into()).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
-
-        match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
-            Some(ipc::Response::QuickSearch(Ok(entries))) => Ok(entries),
-            Some(ipc::Response::QuickSearch(Err(failure))) => Err(ClientError::Message(failure)),
+            Some(ipc::Response::Search(Ok(entries))) => Ok(entries),
+            Some(ipc::Response::Search(Err(failure))) => Err(ClientError::Message(failure)),
             _ => Err(ClientError::Message("unexpected daemon response".into()))
         }
     }

@@ -7,6 +7,7 @@ pub struct ChapterShort {
     pub chapter: String,
     pub volume: String,
     pub title: String,
+    pub lang_code: String
 }
 
 impl std::hash::Hash for ChapterShort {
@@ -21,7 +22,8 @@ impl ChapterShort {
             id,
             chapter: chapter_field.chapter,
             volume: chapter_field.volume,
-            title: chapter_field.title
+            title: chapter_field.title,
+            lang_code: chapter_field.lang_code
         }
     }
 

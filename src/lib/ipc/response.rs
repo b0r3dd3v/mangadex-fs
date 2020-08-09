@@ -21,7 +21,7 @@ impl ipc::IpcReceive for api::MangaDexSession {
 }
 
 #[async_trait::async_trait]
-impl ipc::IpcSend for api::QuickSearchEntry {
+impl ipc::IpcSend for api::SearchEntry {
     async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
         stream.write_u64(self.id).await?;
         self.title.ipc_send(stream).await
@@ -29,9 +29,9 @@ impl ipc::IpcSend for api::QuickSearchEntry {
 }
 
 #[async_trait::async_trait]
-impl ipc::IpcReceive for api::QuickSearchEntry {
-    async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<api::QuickSearchEntry> {
-        Ok(api::QuickSearchEntry {
+impl ipc::IpcReceive for api::SearchEntry {
+    async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<api::SearchEntry> {
+        Ok(api::SearchEntry {
             id: stream.read_u64().await?,
             title: String::ipc_receive(stream).await?
         })
@@ -45,8 +45,7 @@ pub enum Response {
     LogIn(Result<api::MangaDexSession, String>),
     LogOut(Result<(), String>),
     AddManga(Result<String, String>),
-    AddChapter(Result<String, String>),
-    QuickSearch(Result<Vec<api::QuickSearchEntry>, String>)
+    Search(Result<Vec<api::SearchEntry>, String>)
 }
 
 #[async_trait::async_trait]
@@ -55,26 +54,22 @@ impl ipc::IpcSend for Response {
         debug!("sending response: {:?}", self);
 
         match self {
-            Response::Kill => stream.write_u8(1u8).await,
+            Response::Kill => stream.write_u8(ipc::RESPONSE_KILL).await,
             Response::LogIn(login) => {
-                stream.write_u8(2u8).await?;
+                stream.write_u8(ipc::RESPONSE_LOG_IN).await?;
                 login.ipc_send(stream).await
             },
             Response::LogOut(logout) => {
-                stream.write_u8(3u8).await?;
+                stream.write_u8(ipc::RESPONSE_LOG_OUT).await?;
                 logout.ipc_send(stream).await
             },
             Response::AddManga(addmanga) => {
-                stream.write_u8(4u8).await?;
+                stream.write_u8(ipc::RESPONSE_ADD_MANGA).await?;
                 addmanga.ipc_send(stream).await
             },
-            Response::AddChapter(addchapter) => {
-                stream.write_u8(5u8).await?;
-                addchapter.ipc_send(stream).await
-            },
-            Response::QuickSearch(quicksearch) => {
-                stream.write_u8(6u8).await?;
-                quicksearch.ipc_send(stream).await
+            Response::Search(search) => {
+                stream.write_u8(ipc::RESPONSE_SEARCH).await?;
+                search.ipc_send(stream).await
             }
         }
     }
@@ -84,12 +79,11 @@ impl ipc::IpcSend for Response {
 impl ipc::IpcTryReceive for Response {
     async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
         Ok(match stream.read_u8().await? {
-            1u8 => Some(Response::Kill),
-            2u8 => Result::<api::MangaDexSession, String>::ipc_try_receive(stream).await?.map(Response::LogIn),
-            3u8 => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::LogOut),
-            4u8 => Result::<String, String>::ipc_try_receive(stream).await?.map(Response::AddManga),
-            5u8 => Result::<String, String>::ipc_try_receive(stream).await?.map(Response::AddChapter),
-            6u8 => Result::<Vec<api::QuickSearchEntry>, String>::ipc_try_receive(stream).await?.map(Response::QuickSearch),
+            ipc::RESPONSE_KILL => Some(Response::Kill),
+            ipc::RESPONSE_LOG_IN => Result::<api::MangaDexSession, String>::ipc_try_receive(stream).await?.map(Response::LogIn),
+            ipc::RESPONSE_LOG_OUT => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::LogOut),
+            ipc::RESPONSE_ADD_MANGA => Result::<String, String>::ipc_try_receive(stream).await?.map(Response::AddManga),
+            ipc::RESPONSE_SEARCH => Result::<Vec<api::SearchEntry>, String>::ipc_try_receive(stream).await?.map(Response::Search),
             byte => {
                 warn!("received unknown response byte: {}", byte);
                 None

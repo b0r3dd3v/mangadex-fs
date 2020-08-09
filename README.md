@@ -29,14 +29,14 @@ urmom@gay ~> mangadex-fsd ~/Manga
 ```console
 urmom@gay ~> mangadex-fsc login -u <username> -p <password>
 OK
-urmom@gay ~> mangadex-fsc quicksearch "Made In Abyss"
-16482 Made in Abyss
-38973 Made in Abyss Official Anthology
-47082 Made in Abyss 47.X: Welcome Back
-31677 Made In Abyss (Fan Colored)
+urmom@gay ~> mangadex-fsc search --author "Kobayashi Kina" --language jp --publication ongoing --include schoollife comedy
+32431 My First Love Was a Beautiful "Girl"
+30980 About a Lazy High School Guy Who Woke Up as a Girl One Morning (web comic)
+40346 A Lazy Guy Woke Up as a Girl One Morning
+28432 About Getting Asked Out by the Biggest Misogynist in School
 OK
-me@urmom ~> mangadex-fsc add manga 16482
-Manga Made in Abyss has been added.
+urmom@gay ~> mangadex-fsc add manga 40346
+Manga A Lazy Guy Woke Up as a Girl One Morning has been added.
 OK
 ```
 
@@ -52,7 +52,7 @@ OK
 -   API responses are cached, and there is no command for fetching updates currently.
 -   ```sh
     cd <mountpoint>/<manga>/<chapter>
-    ls -1a | xargs -d '\n' feh --image-bg "black" -Z -. -d -S filename --version-sort
+    feh --image-bg "black" -Z -. -d -S filename --version-sort
     ```
 
     creates a good reader. Obviously you need to have [`feh`](https://github.com/derf/feh) installed.
