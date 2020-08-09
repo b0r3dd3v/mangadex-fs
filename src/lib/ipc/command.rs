@@ -136,6 +136,7 @@ impl ipc::IpcTryReceive for api::SearchParams {
 
 #[derive(Debug)]
 pub enum Command {
+    EndConnection,
     Kill,
     LogIn(String, String),
     LogOut,
@@ -149,6 +150,7 @@ impl ipc::IpcSend for Command {
         debug!("sending command: {:?}", self);
 
         match self {
+            Command::EndConnection =>  stream.write_u8(ipc::COMMAND_END_CONNECTION).await,
             Command::Kill => stream.write_u8(ipc::COMMAND_KILL).await,
             Command::LogIn(username, password) => {
                 stream.write_u8(ipc::COMMAND_LOG_IN).await?;
@@ -173,6 +175,7 @@ impl ipc::IpcSend for Command {
 impl ipc::IpcTryReceive for Command {
     async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
         Ok(match stream.read_u8().await? {
+            ipc::COMMAND_END_CONNECTION => Some(Command::EndConnection),
             ipc::COMMAND_KILL => Some(Command::Kill),
             ipc::COMMAND_LOG_IN => Some(Command::LogIn(String::ipc_receive(stream).await?, String::ipc_receive(stream).await?)),
             ipc::COMMAND_LOG_OUT => Some(Command::LogOut),

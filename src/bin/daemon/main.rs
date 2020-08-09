@@ -44,7 +44,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(mut listener) => {
             info!("hello");
 
-            let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
             let (kill_cmd_tx, mut kill_cmd_rx) = tokio::sync::mpsc::channel::<()>(1usize);
 
             let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
@@ -88,12 +87,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             let mut connection = ipc::Connection::new(stream, context.clone(), kill_cmd_tx);
 
-                            handles.push(tokio::spawn(async move {
-                                match connection.handle().await {
+                            tokio::spawn(async move {
+                                match connection.read_eval_loop().await {
                                     Ok(_) => info!("client disconnected"),
                                     Err(error) => warn!("client disconnected with error: {}", error)
                                 }
-                            }));
+                            });
                         },
                         Some(Err(error)) => warn!("connection to a stream failed: {}", error),
                         None => error!("ph'nglui mglw'nafh Cthulhu R'lyeh wgah'nagl fhtagn")

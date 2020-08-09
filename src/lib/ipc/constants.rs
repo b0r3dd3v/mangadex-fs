@@ -1,3 +1,4 @@
+pub const COMMAND_END_CONNECTION: u8 = 0u8;
 pub const COMMAND_KILL: u8 = 1u8;
 pub const COMMAND_LOG_IN: u8 = 2u8;
 pub const COMMAND_LOG_OUT: u8 = 3u8;

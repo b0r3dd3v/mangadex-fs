@@ -68,4 +68,8 @@ impl Client {
             _ => Err(ClientError::Message("unexpected daemon response".into()))
         }
     }
+
+    pub async fn end_connection(mut self) -> ClientResult<()> {
+        ipc::Command::EndConnection.ipc_send(&mut self.stream).await.map_err(ClientError::IO)
+    }
 }

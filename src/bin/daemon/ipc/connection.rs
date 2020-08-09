@@ -18,22 +18,25 @@ impl Connection {
         Connection { stream, context, kill }
     }
 
-    pub async fn handle(&mut self) -> std::io::Result<()> {
-        match ipc::Command::ipc_try_receive(&mut self.stream).await? {
-            Some(command) => {
-                let response = match command {
-                    ipc::Command::Kill => self.kill().await?,
-                    ipc::Command::LogIn(username, password) => self.log_in(username, password).await?,
-                    ipc::Command::LogOut => self.log_out().await?,
-                    ipc::Command::AddManga(id, languages) => self.add_manga(id, languages).await?,
-                    ipc::Command::Search(params) => self.search(&params).await?
-                };
+    pub async fn read_eval_loop(&mut self) -> std::io::Result<()> {
+        loop {
+            return match ipc::Command::ipc_try_receive(&mut self.stream).await? {
+                Some(command) => {
+                    let response = match command {
+                        ipc::Command::EndConnection => return Ok(()),
+                        ipc::Command::Kill => self.kill().await?,
+                        ipc::Command::LogIn(username, password) => self.log_in(username, password).await?,
+                        ipc::Command::LogOut => self.log_out().await?,
+                        ipc::Command::AddManga(id, languages) => self.add_manga(id, languages).await?,
+                        ipc::Command::Search(params) => self.search(&params).await?
+                    };
 
-                response.ipc_send(&mut self.stream).await?;
+                    response.ipc_send(&mut self.stream).await?;
 
-                Ok(())
-            },
-            None => Ok(())
+                    Ok(())
+                },
+                None => Ok(())
+            }
         }
     }
 
@@ -52,7 +55,7 @@ impl Connection {
                 ipc::Response::LogIn(Ok(session.clone()))
             },
             Err(error) => {
-                error!("log in error: {:?}", error);
+                warn!("log in error: {:?}", error);
 
                 match error {
                     api::LogInError::Response(body) => ipc::Response::LogIn(Err(String::from("MangaDex response: ") + &body)),
@@ -70,7 +73,7 @@ impl Connection {
                 ipc::Response::LogOut(Ok(()))
             },
             Err(error) => {
-                error!("log out error: {:?}", error);
+                warn!("log out error: {:?}", error);
 
                 ipc::Response::LogOut(Err("request error".into()))
             }
@@ -104,7 +107,7 @@ impl Connection {
                 }
             },
             Err(error) => {
-                error!("add manga request error: {}", error);
+                warn!("add manga request error: {}", error);
 
                 ipc::Response::AddManga(Err("request error".into()))
             }
@@ -119,7 +122,7 @@ impl Connection {
                 ipc::Response::Search(Ok(results))
             },
             Err(error) => {
-                error!("search error: {:?}", error);
+                warn!("search error: {:?}", error);
                 
                 match error {
                     api::SearchError::Request(_) => ipc::Response::Search(Err("request error".into())),
