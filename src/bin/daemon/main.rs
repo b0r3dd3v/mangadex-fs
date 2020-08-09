@@ -55,11 +55,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let uid = nix::unistd::Uid::current();
             let gid = nix::unistd::Gid::current();
 
-            let context = mangadex_fs::Context::new();
+            let mut polyfuse_server = polyfuse_tokio::Server::mount(mountpoint, &[]).await?;
+
+            let context = mangadex_fs::Context::new(polyfuse_server.try_clone()?, uid, gid);
+
+            let polyfuse_context = context.clone();
+            let (polyfuse_sig_tx, polyfuse_sig) = tokio::sync::oneshot::channel();
             
-            let (fuse_sig_tx, fuse_sig) = tokio::sync::oneshot::channel();
-            let mut polyfuse = polyfuse_tokio::Server::mount(mountpoint, &[]).await?;
-            let polyfuse_result = polyfuse.run_until(mangadex_fs::MangaDexFS::new(uid, gid, context.clone()), fuse_sig);
+            let polyfuse = tokio::spawn(async move {
+                polyfuse_server.run_until(mangadex_fs::MangaDexFS::new(polyfuse_context), polyfuse_sig).await
+            });
 
             loop {
                 let kill_cmd_tx = kill_cmd_tx.clone();
@@ -100,8 +105,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            fuse_sig_tx.send(()).expect("MikuDex");
-            polyfuse_result.await?;
+            polyfuse_sig_tx.send(()).ok();
+            polyfuse.await?.ok();
 
             tokio::fs::remove_file(config.socket).await?;
             info!("goodbye");

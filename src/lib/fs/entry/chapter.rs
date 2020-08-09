@@ -18,7 +18,7 @@ impl Hosted {
 
 #[derive(Debug)]
 pub struct External {
-    url: reqwest::Url
+    pub url: reqwest::Url
 }
 
 impl External {
@@ -89,11 +89,11 @@ impl Chapter {
         };
 
         match (self.title.is_empty(), self.volume.is_empty()) {
-            (true, true) => sanitize_filename::sanitize(format!("{} [{:06x}]", self.chapter, hash)),
-            (true, false) => sanitize_filename::sanitize(format!("{}.{} [{:06x}]", self.volume, self.chapter, hash)),
-            (false, true) => sanitize_filename::sanitize(format!("{} {} [{:06x}]", self.chapter, self.title, hash)),
+            (true, true) => sanitize_filename::sanitize(format!("Ch. {} [{:06x}]", self.chapter, hash)),
+            (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {} [{:06x}]", self.volume, self.chapter, hash)),
+            (false, true) => sanitize_filename::sanitize(format!("Ch. {} - {} [{:06x}]", self.chapter, self.title, hash)),
             _ => sanitize_filename::sanitize(format!(
-                "{}.{} {} [{:06x}]",
+                "Vol. {} Ch. {} - {} [{:06x}]",
                 self.volume, self.chapter, self.title, hash
             ))
         }

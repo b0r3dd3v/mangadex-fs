@@ -43,6 +43,7 @@ impl MangaDexAPI {
         where
             L: Into<std::borrow::Cow<'static, str>>,
             P: Into<std::borrow::Cow<'static, str>> {
+
         let result = api::MangaDexSession::log_in(&self.client, login, password).await;
 
         match result {
@@ -62,12 +63,8 @@ impl MangaDexAPI {
         api::Chapter::get(&self.client, id).await
     }
 
-    pub async fn get_proxy_page(&self, url: &reqwest::Url) -> Result<api::PageProxy, AddChapterError> {
-        api::PageProxy::get(&self.client, url).await
-    }
-
-    pub async fn get_page(&self, url: &reqwest::Url) -> Result<api::Page, AddChapterError> {
-        api::Page::get(&self.client, url).await
+    pub async fn get_page(&self, chapter_id: u64, url: &reqwest::Url) -> Result<api::Page, AddChapterError> {
+        api::Page::get(&self.client, chapter_id, url).await
     }
 
     pub async fn quick_search<S: AsRef<str>>(&self, query: S) -> Result<Vec<api::QuickSearchEntry>, api::QuickSearchError> {

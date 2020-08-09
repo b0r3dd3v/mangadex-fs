@@ -1,87 +1,100 @@
 pub mod entry;
 
 pub struct MangaDexFS {
-    context: std::sync::Arc<crate::Context>,
-    uid: nix::unistd::Uid,
-    gid: nix::unistd::Gid
-}
-
-fn root_attr(uid: nix::unistd::Uid, gid: nix::unistd::Gid) -> polyfuse::FileAttr {
-    let mut attr = polyfuse::FileAttr::default();
-    attr.set_size(4096u64);
-    attr.set_blocks(4u64);
-    attr.set_atime(std::time::SystemTime::now());
-    attr.set_mtime(std::time::SystemTime::now());
-    attr.set_ctime(std::time::SystemTime::now());
-    attr.set_mode(libc::S_IFDIR as u32 | 0o555);
-    attr.set_nlink(2);
-    attr.set_uid(uid.as_raw() as u32);
-    attr.set_gid(gid.as_raw() as u32);
-    attr.set_rdev(0u32);
-    attr
+    context: std::sync::Arc<crate::Context>
 }
 
 impl MangaDexFS {
-    pub fn new(uid: nix::unistd::Uid, gid: nix::unistd::Gid, context: std::sync::Arc<crate::Context>) -> MangaDexFS {
+    pub fn new(context: std::sync::Arc<crate::Context>) -> MangaDexFS {
         MangaDexFS {
-            context, uid, gid
+            context
         }
     }
 
     async fn do_lookup(&self, op: &polyfuse::op::Lookup<'_>) -> std::io::Result<polyfuse::reply::ReplyEntry> {
-        if op.parent() == 1 {
-            let reply = {
-                let mut reply = polyfuse::reply::ReplyEntry::default();
-                
-                reply.ino(1);
-                reply.generation(0u64);
-                reply.ttl_entry(std::time::Duration::new(0u64, 0u32));
-                reply.ttl_attr(std::time::Duration::new(0u64, 0u32));
-                reply.attr(root_attr(self.uid, self.gid));
-                reply
-            };
+        let entries = self.context.entries.read().await;
 
-            Ok(reply)
-        }
-        else {
-            Err(std::io::Error::from_raw_os_error(libc::EINVAL))
+        let make_result = |directory: &entry::Directory| -> std::io::Result<polyfuse::reply::ReplyEntry> {
+            match directory.entries().into_iter().find(|direntry| direntry.name() == op.name()) {
+                // If child direntry is found, find its ino in entries
+                Some(child_direntry) => match entries.get(&child_direntry.nodeid()) {
+                    // If child inode is found
+                    Some(child_inode) => {
+                        let mut reply = polyfuse::reply::ReplyEntry::default();
+                        let attr = child_inode.get_attr();
+
+                        match attr {
+                            Some(attr) => {
+                                reply.ino(attr.ino());
+                                reply.attr(attr);
+                                reply.ttl_attr(std::time::Duration::from_secs(1u64));
+                                reply.ttl_entry(std::time::Duration::from_secs(1u64));
+
+                                Ok(reply)
+                            },
+                            None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+                        }
+                    },
+                    None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+                },
+                None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+            }
+        };
+
+        // Find parent entry from op parent
+        match entries.get(&op.parent()) {
+            Some(entry::Inode(entry::Entry::Root(directory), _)) => make_result(directory),
+            Some(entry::Inode(entry::Entry::Manga(_, directory), _)) => make_result(directory),
+            Some(entry::Inode(entry::Entry::Chapter(_, directory), _)) => make_result(directory),
+            Some(entry::Inode(entry::Entry::ChapterNotFetched(_), _)) => Err(std::io::Error::from_raw_os_error(libc::EINVAL)),
+            Some(entry::Inode(entry::Entry::Page(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
+            Some(entry::Inode(entry::Entry::External(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
+            None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
         }
     }
 
     async fn do_getattr(&self, op: &polyfuse::op::Getattr<'_>) -> std::io::Result<polyfuse::reply::ReplyAttr> {
-        debug!("getattr {:?}", op);
-
-        if op.ino() == 1 {
-            let reply = {
-                let mut reply = polyfuse::reply::ReplyAttr::new(root_attr(self.uid, self.gid));
-                reply.ttl_attr(std::time::Duration::from_millis(0u64));
+        match self.context.entries.read().await.get(&op.ino()).and_then(|inode| inode.get_attr()) {
+            Some(file_attr) => Ok({                
+                let mut reply = polyfuse::reply::ReplyAttr::new(file_attr);
+                reply.ttl_attr(std::time::Duration::from_secs(1u64));
                 reply
-            };
-
-            Ok(reply)
-        }
-        else {
-            Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+            }),
+            None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
         }
     }
 
-    async fn do_read(&self, op: &polyfuse::op::Read<'_>) -> std::io::Result<&[u8]> {
-        debug!("read {:?}", op);
+    async fn do_read(&self, op: &polyfuse::op::Read<'_>) -> std::io::Result<Vec<u8>> {
+        let read_lock = self.context.entries.read().await;
 
-        Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+        match read_lock.get(&op.ino()) {
+            Some(entry::Inode(entry::Entry::Page(page_ref), _)) => match page_ref.upgrade() {
+                Some(page) => {
+                    let bytes: Vec<u8> = page.0[op.offset() as usize..std::cmp::min(op.offset() as usize + op.size() as usize, page.0.len())].into();
+                    Ok(bytes)
+                }
+                None => Err(std::io::Error::from_raw_os_error(libc::EIO))
+            },
+            Some(entry::Inode(entry::Entry::External(bytes), _)) => Ok(bytes.clone()),
+            Some(_) => Err(std::io::Error::from_raw_os_error(libc::EINVAL)),
+            None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+        }
     }
 
     async fn do_readdir(&self, op: &polyfuse::op::Readdir<'_>) -> std::io::Result<Vec<u8>> {
-        debug!("readdir {:?}", op);
+        let make_reply = |directory: &entry::Directory| -> Vec<u8> {
+            let entries = {
+                let mut entries = vec![
+                    polyfuse::DirEntry::dir(".", op.ino(), 1),
+                    polyfuse::DirEntry::dir("..", op.ino(), 2)
+                ];
 
-        if op.ino() != 1 {
-            Err(std::io::Error::from_raw_os_error(libc::ENOTDIR))
-        }
-        else {
-            let entries = vec![
-                polyfuse::DirEntry::dir(".", 1, 1),
-                polyfuse::DirEntry::dir("..", 1, 2)
-            ];
+                for entry in directory.entries() {
+                    entries.push(entry);
+                }
+
+                entries
+            };
 
             let mut entries_reply = vec![];
             let mut total_len = 0usize;
@@ -99,7 +112,34 @@ impl MangaDexFS {
                 total_len += entry.len();
             }
 
-            Ok(entries_reply)
+            entries_reply
+        };
+
+        let read_lock = self.context.entries.read().await;
+
+        match read_lock.get(&op.ino()) {
+            Some(entry::Inode(entry::Entry::Root(directory), _)) => Ok(make_reply(directory)),
+            Some(entry::Inode(entry::Entry::Manga(_, directory), _)) => Ok(make_reply(directory)),
+            Some(entry::Inode(entry::Entry::Chapter(_, directory), _)) => Ok(make_reply(directory)),
+            Some(entry::Inode(entry::Entry::ChapterNotFetched(chapter_id_ref), _)) => {
+                let chapter_id = *chapter_id_ref;
+
+                drop(chapter_id_ref);
+                drop(read_lock);
+
+                match self.context.get_or_fetch_chapter(chapter_id).await {
+                    Ok(_) => {
+                        match self.context.entries.read().await.get(&op.ino()) {
+                            Some(entry::Inode(entry::Entry::Chapter(_, directory), _)) => Ok(make_reply(directory)),
+                            _ => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+                        }
+                    },
+                    Err(_) => Err(std::io::Error::from_raw_os_error(libc::EIO))
+                }
+            },
+            Some(entry::Inode(entry::Entry::Page(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
+            Some(entry::Inode(entry::Entry::External(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
+            None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
         }
     }
 }
