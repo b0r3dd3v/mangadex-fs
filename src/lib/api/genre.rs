@@ -216,7 +216,7 @@ impl std::convert::TryFrom<&str> for Genre {
             "anthology" => Ok(Genre::Anthology),
             "webcomic" => Ok(Genre::WebComic),
             "fullcolor" => Ok(Genre::FullColor),
-            "csercreated" => Ok(Genre::UserCreated),
+            "usercreated" => Ok(Genre::UserCreated),
             "officialcolored" => Ok(Genre::OfficialColored),
             "fancolored" => Ok(Genre::FanColored),
             "gore" => Ok(Genre::Gore),
