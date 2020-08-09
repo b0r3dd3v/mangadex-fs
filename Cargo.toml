@@ -1,6 +1,6 @@
 [package]
 name = "mangadex-fs"
-version = "0.2.0-beta.3"
+version = "0.2.0-beta.4"
 authors = ["bittersweetshimmer"]
 edition = "2018"
 repository = "https://github.com/bittersweetshimmer/mangadex-fs"

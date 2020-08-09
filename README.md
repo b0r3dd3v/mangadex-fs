@@ -29,7 +29,10 @@ urmom@gay ~> mangadex-fsd ~/Manga
 ```console
 urmom@gay ~> mangadex-fsc login -u <username> -p <password>
 OK
-urmom@gay ~> mangadex-fsc search --author "Kobayashi Kina" --language jp --publication ongoing --include schoollife comedy
+urmom@gay ~> mangadex-fsc search --author "Kobayashi Kina" \
+                                 --language jp \
+                                 --publication ongoing \
+                                 --include schoollife comedy
 32431 My First Love Was a Beautiful "Girl"
 30980 About a Lazy High School Guy Who Woke Up as a Girl One Morning (web comic)
 40346 A Lazy Guy Woke Up as a Girl One Morning
