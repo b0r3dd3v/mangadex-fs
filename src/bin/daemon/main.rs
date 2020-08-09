@@ -2,12 +2,19 @@
 extern crate log;
 
 mod ipc;
+mod cli;
 use tokio::stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
+    let cli = cli::daemon()
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(format!("{} <bttrswt@protonmail.com>", env!("CARGO_PKG_AUTHORS")).as_str())
+        .about(format!("{}\nThis binary is the daemon/filesystem part.", env!("CARGO_PKG_DESCRIPTION")).as_str())
+        .get_matches();
+    
     info!("consider supporting MangaDex at https://mangadex.org/support");
 
     let config = if mangadex_fs::cfg::config_file_path().exists() {
@@ -37,18 +44,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(mut listener) => {
             info!("hello");
 
-            let api = std::sync::Arc::new(tokio::sync::Mutex::new(mangadex_fs::api::MangaDexAPI::new()));
             let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
-            let (kill_tx, mut kill_rx) = tokio::sync::mpsc::channel(1usize);
+            let (kill_cmd_tx, mut kill_cmd_rx) = tokio::sync::mpsc::channel::<()>(1usize);
 
             let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
             let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
 
+            let mountpoint = cli.value_of("path").unwrap().to_owned();
+
+            let uid = nix::unistd::Uid::current();
+            let gid = nix::unistd::Gid::current();
+
+            let mut polyfuse_server = polyfuse_tokio::Server::mount(mountpoint, &[]).await?;
+
+            let context = mangadex_fs::Context::new(polyfuse_server.try_clone()?, uid, gid);
+
+            let polyfuse_context = context.clone();
+            let (polyfuse_sig_tx, polyfuse_sig) = tokio::sync::oneshot::channel();
+            
+            let polyfuse = tokio::spawn(async move {
+                polyfuse_server.run_until(mangadex_fs::MangaDexFS::new(polyfuse_context), polyfuse_sig).await
+            });
+
             loop {
-                let mut kill_tx = kill_tx.clone();
+                let kill_cmd_tx = kill_cmd_tx.clone();
 
                 tokio::select! {
-                    _ = kill_rx.recv() => {
+                    _ = kill_cmd_rx.recv() => {
                         info!("received a kill subcommand, shutting down...");
                         break;
                     },
@@ -62,23 +84,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                     maybe_stream = listener.next() => match maybe_stream {
                         Some(Ok(stream)) => {
-                            debug!("client connected");
+                            info!("client connected");
 
-                            let mut connection = ipc::Connection::new(stream, api.clone());
+                            let mut connection = ipc::Connection::new(stream, context.clone(), kill_cmd_tx);
 
                             handles.push(tokio::spawn(async move {
-                                match connection.read_command().await {
-                                    Ok(mangadex_fs::ipc::KILL) => kill_tx.send(()).await.unwrap_or(()),
-                                    Ok(mangadex_fs::ipc::LOG_IN) => connection.log_in().await.unwrap_or(()),
-                                    Ok(mangadex_fs::ipc::LOG_OUT) => connection.log_out().await.unwrap_or(()),
-                                    Ok(mangadex_fs::ipc::ADD_MANGA) => connection.add_manga().await.unwrap_or(()),
-                                    Ok(mangadex_fs::ipc::ADD_CHAPTER) => connection.add_chapter().await.unwrap_or(()),
-                                    Ok(mangadex_fs::ipc::QUICK_SEARCH) => connection.quick_search().await.unwrap_or(()),
-                                    Ok(byte) => warn!("invalid client command \"{}\"", byte),
-                                    Err(error) => error!("read command IO error: {}", error)
-                                };
-                            
-                                debug!("client disconnected");
+                                match connection.handle().await {
+                                    Ok(_) => info!("client disconnected"),
+                                    Err(error) => warn!("client disconnected with error: {}", error)
+                                }
                             }));
                         },
                         Some(Err(error)) => warn!("connection to a stream failed: {}", error),
@@ -90,6 +104,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+
+            polyfuse_sig_tx.send(()).ok();
+            polyfuse.await?.ok();
 
             tokio::fs::remove_file(config.socket).await?;
             info!("goodbye");

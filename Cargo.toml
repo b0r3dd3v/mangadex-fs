@@ -1,6 +1,6 @@
 [package]
 name = "mangadex-fs"
-version = "0.2.0-alpha.0"
+version = "0.2.0-beta.0"
 authors = ["bittersweetshimmer"]
 edition = "2018"
 repository = "https://github.com/bittersweetshimmer/mangadex-fs"
@@ -16,7 +16,7 @@ readme = "README.md"
 reqwest = { version = "0.10", features = ["json"] }
 scraper = "0.12"
 cookie = "0.14"
-tokio = { version = "0.2", features = ["macros", "uds", "io-util", "fs", "rt-core", "signal", "macros", "sync"] }
+tokio = { version = "0.2", features = ["macros", "uds", "io-util", "fs", "rt-core", "signal", "macros", "sync", "time"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
 clap = "2.33"
@@ -25,6 +25,14 @@ env_logger = "0.7"
 colored = "2.0"
 directories = "3.0"
 toml = "0.5"
+nix = "0.18"
+polyfuse = "0.3.3"
+polyfuse-tokio = "0.2.0"
+time = "0.2.16"
+chrono = "0.4.13"
+libc = "0.2.5"
+sanitize-filename = "0.2.1"
+async-trait = "0.1.36"
 
 [lib]
 name = "mangadex_fs"
