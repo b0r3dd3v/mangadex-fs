@@ -69,13 +69,10 @@ impl MangaDexFS {
 
         match read_lock.get(&op.ino()) {
             Some(entry::Inode(entry::Entry::Page(page_ref), _)) => match page_ref.upgrade() {
-                Some(page) => {
-                    let bytes: Vec<u8> = page.0[op.offset() as usize..std::cmp::min(op.offset() as usize + op.size() as usize, page.0.len())].into();
-                    Ok(bytes)
-                }
+                Some(page) => Ok(page.0[op.offset() as usize..std::cmp::min(op.offset() as usize + op.size() as usize, page.0.len())].into()),
                 None => Err(std::io::Error::from_raw_os_error(libc::EIO))
             },
-            Some(entry::Inode(entry::Entry::External(bytes), _)) => Ok(bytes.clone()),
+            Some(entry::Inode(entry::Entry::External(bytes), _)) => Ok(bytes[op.offset() as usize..std::cmp::min(op.offset() as usize + op.size() as usize, bytes.len())].into()),
             Some(_) => Err(std::io::Error::from_raw_os_error(libc::EINVAL)),
             None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
         }

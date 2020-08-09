@@ -32,7 +32,7 @@ impl Attributes {
 
 #[derive(Debug)]
 pub struct Directory {
-    pub children: std::collections::HashMap<std::path::PathBuf, u64>,
+    pub children: std::collections::HashMap<std::path::PathBuf, (u64, bool)>,
     pub parent: Option<u64>,
 }
 
@@ -55,7 +55,14 @@ impl Directory {
         self.children
             .iter()
             .enumerate()
-            .map(|(index, (path, ino))| polyfuse::DirEntry::dir(path, *ino, index as u64 + 3u64))
+            .map(|(index, (path, (ino, is_file)))| {
+                if *is_file {
+                    polyfuse::DirEntry::file(path, *ino, index as u64 + 3u64)
+                }
+                else {
+                    polyfuse::DirEntry::dir(path, *ino, index as u64 + 3u64)
+                }
+            })
             .collect::<Vec<_>>()
     }
 }
