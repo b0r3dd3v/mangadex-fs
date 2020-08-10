@@ -27,11 +27,6 @@ pub trait IpcTryReceive: Sized {
 }
 
 #[async_trait::async_trait]
-impl<T: IpcReceive> IpcTryReceive for T {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> { Ok(Some(T::ipc_receive(stream).await?)) }
-}
-
-#[async_trait::async_trait]
 impl IpcSend for () {
     async fn ipc_send(&self, _stream: &mut tokio::net::UnixStream) -> std::io::Result<()> { Ok(()) }
 }
@@ -42,6 +37,11 @@ impl IpcReceive for () {
 }
 
 #[async_trait::async_trait]
+impl IpcTryReceive for () {
+    async fn ipc_try_receive(_stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> { Ok(Some(())) }
+}
+
+#[async_trait::async_trait]
 impl IpcSend for u8 {
     async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> { stream.write_u8(*self).await }
 }
@@ -49,6 +49,11 @@ impl IpcSend for u8 {
 #[async_trait::async_trait]
 impl IpcReceive for u8 {
     async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Self> { stream.read_u8().await }
+}
+
+#[async_trait::async_trait]
+impl IpcTryReceive for u8 {
+    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> { stream.read_u8().await.map(Some) }
 }
 
 #[async_trait::async_trait]
@@ -82,6 +87,13 @@ impl IpcReceive for String {
 }
 
 #[async_trait::async_trait]
+impl IpcTryReceive for String {
+    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+        String::ipc_receive(stream).await.map(Some)
+    }
+}
+
+#[async_trait::async_trait]
 impl<T: IpcSend> IpcSend for Vec<T> {
     async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
         stream.write_u64(self.len() as u64).await?;
@@ -105,6 +117,23 @@ impl<T: IpcReceive + Send> IpcReceive for Vec<T> {
         }
 
         Ok(buffer)
+    }
+}
+
+#[async_trait::async_trait]
+impl<T: IpcTryReceive + Send> IpcTryReceive for Vec<T> {
+    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+        let length: u64 = stream.read_u64().await?;
+        let mut buffer = Vec::with_capacity(length as usize);
+                            
+        for _ in 0 .. length {
+            match T::ipc_try_receive(stream).await? {
+                Some(value) => buffer.push(value),
+                None => return Ok(None)
+            };
+        }
+
+        Ok(Some(buffer))
     }
 }
 

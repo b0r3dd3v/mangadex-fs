@@ -141,7 +141,8 @@ pub enum Command {
     LogIn(String, String),
     LogOut,
     AddManga(u64, Vec<String>),
-    Search(api::SearchParams)
+    Search(api::SearchParams),
+    MDList(u64)
 }
 
 #[async_trait::async_trait]
@@ -166,6 +167,10 @@ impl ipc::IpcSend for Command {
             Command::Search(params) => {
                 stream.write_u8(ipc::COMMAND_SEARCH).await?;
                 params.ipc_send(stream).await
+            },
+            Command::MDList(id) => {
+                stream.write_u8(ipc::COMMAND_MDLIST).await?;
+                stream.write_u64(*id).await
             }
         }
     }
@@ -181,6 +186,7 @@ impl ipc::IpcTryReceive for Command {
             ipc::COMMAND_LOG_OUT => Some(Command::LogOut),
             ipc::COMMAND_ADD_MANGA => Some(Command::AddManga(stream.read_u64().await?, Vec::<String>::ipc_receive(stream).await?)),
             ipc::COMMAND_SEARCH => api::SearchParams::ipc_try_receive(stream).await?.map(Command::Search),
+            ipc::COMMAND_MDLIST => Some(Command::MDList(stream.read_u64().await?)),
             byte => {
                 warn!("received unknown command byte: {}", byte);
                 None

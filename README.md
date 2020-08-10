@@ -29,17 +29,12 @@ urmom@gay ~> mangadex-fsd ~/Manga
 ```console
 urmom@gay ~> mangadex-fsc login -u <username> -p <password>
 OK
-urmom@gay ~> mangadex-fsc search --author "Kobayashi Kina" \
-                                 --language jp \
-                                 --publication ongoing \
-                                 --include schoollife comedy
-32431 My First Love Was a Beautiful "Girl"
-30980 About a Lazy High School Guy Who Woke Up as a Girl One Morning (web comic)
-40346 A Lazy Guy Woke Up as a Girl One Morning
-28432 About Getting Asked Out by the Biggest Misogynist in School
+urmom@gay ~> mangadex-fsc search --author "Dowman Sayman" --include anthology supernatural
+ 4261 Nickelodeon │ Dowman Sayman │ Not followed    │ 2 mo ago
+20563 Melancholia │ Dowman Sayman │ Not followed    │ 2 mo ago
 OK
-urmom@gay ~> mangadex-fsc add manga 40346
-Manga A Lazy Guy Woke Up as a Girl One Morning has been added.
+urmom@gay ~> mangadex-fsc add manga 20563
+Manga Melancholia has been added.
 OK
 ```
 

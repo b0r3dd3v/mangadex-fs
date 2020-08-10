@@ -7,6 +7,8 @@ pub mod api;
 pub mod search;
 pub mod user_agent;
 pub mod page;
+pub mod mdlist;
+pub mod set_view_mode;
 
 pub use session::*;
 pub use manga::*;
@@ -17,3 +19,5 @@ pub use api::*;
 pub use search::*;
 pub use user_agent::*;
 pub use page::*;
+pub use mdlist::*;
+pub use set_view_mode::*;

@@ -269,4 +269,15 @@ pub fn client<'a, 'b>() -> clap::App<'a, 'b> {
                     .required(false)
                     .multiple(true)
                     .default_value("gb"))))
+        .subcommand(clap::SubCommand::with_name("show")
+            .subcommand(clap::SubCommand::with_name("mdlist")
+                .about("Shows MDList for a given ID. If logged in, also lists authors and last updates")
+                .arg(clap::Arg::with_name("mdlist_id")
+                    .help("MDList ID")
+                    .takes_value(true)
+                    .required(true)
+                    .validator(|m| match m.parse::<u64>() {
+                        Err(e) => Err(e.to_string()),
+                        _ => Ok(())
+                    }))))
 }

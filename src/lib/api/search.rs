@@ -164,7 +164,10 @@ impl Default for SearchParams {
 #[derive(Debug)]
 pub struct SearchEntry {
     pub id: u64,
-    pub title: String
+    pub title: String,
+    pub author: String,
+    pub status: Option<api::MDListStatus>,
+    pub last_update: String
 }
 
 fn headers(session: &api::MangaDexSession) -> reqwest::header::HeaderMap {
@@ -184,6 +187,8 @@ fn headers(session: &api::MangaDexSession) -> reqwest::header::HeaderMap {
 }
 
 pub async fn search(client: &reqwest::Client, session: &api::MangaDexSession, params: &SearchParams) -> Result<Vec<SearchEntry>, reqwest::Error> {
+    api::set_view_mode(client, session, api::ViewMode::SimpleList).await.ok();
+
     let mut url = reqwest::Url::parse("https://mangadex.org/search/").unwrap();
 
     url.query_pairs_mut().append_pair("title", &params.title);
@@ -255,22 +260,62 @@ pub async fn search(client: &reqwest::Client, session: &api::MangaDexSession, pa
 
     let html = scraper::Html::parse_document(text.as_str());
 
-    Ok(html.select(&scraper::Selector::parse("div > div > div.manga-entry").unwrap())
+    Ok(html.select(&scraper::Selector::parse("div#content > div.manga-entry").unwrap())
         .into_iter()
         .map(|entry_node| {
             let element = &entry_node.value();
 
+            //title_node.value().attr("title").unwrap()
             let id = element.attr("data-id").unwrap().parse::<u64>().unwrap();
-            let title: String = entry_node
-                .select(&scraper::Selector::parse("div > a.manga_title").unwrap())
-                .into_iter()
-                .map(|title_node| title_node.value().attr("title").unwrap())
-                .collect::<Vec<&str>>()
-                .first()
-                .unwrap()
-                .to_string();
+            let row_selector = scraper::Selector::parse("div > div.row > div").unwrap();
+            let mut rows = entry_node.select(&row_selector);
 
-            SearchEntry { id, title }
+            let link_selector = scraper::Selector::parse("a").unwrap();
+
+            let title = rows
+                .nth(0)
+                .and_then(|el| el.select(&link_selector)
+                    .next()
+                    .and_then(|el| el.value().attr("title"))
+                ).unwrap_or("<unknown title>");
+            let author = rows
+                .nth(1)
+                .and_then(|el| el.select(&link_selector)
+                    .next()
+                    .and_then(|el| el.value().attr("title"))
+                ).unwrap_or("<unknown author>");
+            let status = rows
+                .nth(0)
+                .and_then(|el| {
+                    let span_selector = scraper::Selector::parse("span").unwrap();
+                    let mut spans = el.select(&span_selector);
+
+                    let string = spans
+                        .nth(1)
+                        .map(|span| span
+                            .text()
+                            .fold(String::from(""), |acc, text| acc + text));
+                       
+                    println!("string: {:?}", string);
+                    string
+                }).and_then(|string: String| match string.as_str() {
+                    "Reading" => Some(api::MDListStatus::Reading),
+                    "Completed" => Some(api::MDListStatus::Completed),
+                    "On hold" => Some(api::MDListStatus::OnHold),
+                    "Plan to read" => Some(api::MDListStatus::PlanToRead),
+                    "Dropped" => Some(api::MDListStatus::Dropped),
+                    "Re-reading" => Some(api::MDListStatus::ReReading),
+                    _ => None
+                });
+
+            let last_update = rows
+                .last()
+                .map(|el| el
+                    .text()
+                    .fold(String::from(""), |acc, text| acc + text))
+                .unwrap_or(String::from("-")).trim().to_string();
+
+            SearchEntry { id, title: title.to_string(), author: author.to_string(), status, last_update }
         })
         .collect())
 }

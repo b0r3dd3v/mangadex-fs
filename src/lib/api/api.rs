@@ -1,7 +1,7 @@
 use crate::api;
 
 #[derive(Debug)]
-pub enum SearchError {
+pub enum APIError {
     Request(reqwest::Error),
     NotLoggedIn
 }
@@ -66,10 +66,17 @@ impl MangaDexAPI {
         api::Page::get(&self.client, chapter_id, url).await
     }
 
-    pub async fn search(&self, params: &api::SearchParams) -> Result<Vec<api::SearchEntry>, api::SearchError> {
+    pub async fn search(&self, params: &api::SearchParams) -> Result<Vec<api::SearchEntry>, api::APIError> {
         match &self.session {
-            Some(session) => api::search(&self.client, &session, params).await.map_err(SearchError::Request),
-            None => Err(SearchError::NotLoggedIn)
+            Some(session) => api::search(&self.client, &session, params).await.map_err(APIError::Request),
+            None => Err(APIError::NotLoggedIn)
+        }
+    }
+
+    pub async fn mdlist(&self, id: u64) -> Result<api::MDList, api::APIError> {
+        match &self.session {
+            Some(session) => api::mdlist(&self.client, &session, id).await.map(api::MDList::LoggedIn).map_err(APIError::Request),
+            None => api::mdlist_notloggedin(&self.client, id).await.map(api::MDList::NotLoggedIn).map_err(APIError::Request),
         }
     }
 }

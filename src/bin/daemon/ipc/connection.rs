@@ -28,7 +28,8 @@ impl Connection {
                         ipc::Command::LogIn(username, password) => self.log_in(username, password).await?,
                         ipc::Command::LogOut => self.log_out().await?,
                         ipc::Command::AddManga(id, languages) => self.add_manga(id, languages).await?,
-                        ipc::Command::Search(params) => self.search(&params).await?
+                        ipc::Command::Search(params) => self.search(&params).await?,
+                        ipc::Command::MDList(id) => self.mdlist(id).await?
                     };
 
                     response.ipc_send(&mut self.stream).await?;
@@ -125,8 +126,29 @@ impl Connection {
                 warn!("search error: {:?}", error);
                 
                 match error {
-                    api::SearchError::Request(_) => ipc::Response::Search(Err("request error".into())),
-                    api::SearchError::NotLoggedIn => ipc::Response::Search(Err("you need to be logged in to use search".into()))
+                    api::APIError::Request(_) => ipc::Response::Search(Err("request error".into())),
+                    api::APIError::NotLoggedIn => ipc::Response::Search(Err("you need to be logged in to use this command".into()))
+                }
+            }
+        })
+    }
+
+    pub async fn mdlist(&mut self, id: u64) -> std::io::Result<ipc::Response> {
+        Ok(match self.context.mdlist(id).await {
+            Ok(results) => {
+                match &results {
+                    api::MDList::LoggedIn(results) => info!("found {} results for mdlist {:?}", results.len(), id),
+                    api::MDList::NotLoggedIn(results) => info!("found {} results for mdlist (not logged in) {:?}", results.len(), id)
+                };
+
+                ipc::Response::MDList(Ok(results))
+            },
+            Err(error) => {
+                warn!("mdlist error: {:?}", error);
+                
+                match error {
+                    api::APIError::Request(_) => ipc::Response::Search(Err("request error".into())),
+                    api::APIError::NotLoggedIn => ipc::Response::Search(Err("you need to be logged in to use this command".into()))
                 }
             }
         })

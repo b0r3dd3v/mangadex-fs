@@ -69,6 +69,16 @@ impl Client {
         }
     }
 
+    pub async fn mdlist(&mut self, id: u64) -> ClientResult<api::MDList> {
+        ipc::Command::MDList(id).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+
+        match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
+            Some(ipc::Response::MDList(Ok(entries))) => Ok(entries),
+            Some(ipc::Response::MDList(Err(failure))) => Err(ClientError::Message(failure)),
+            _ => Err(ClientError::Message("unexpected daemon response".into()))
+        }
+    }
+
     pub async fn end_connection(mut self) -> ClientResult<()> {
         ipc::Command::EndConnection.ipc_send(&mut self.stream).await.map_err(ClientError::IO)
     }

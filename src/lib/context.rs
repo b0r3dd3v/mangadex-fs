@@ -312,7 +312,11 @@ impl Context {
         }
     }
 
-    pub async fn search(&self, params: &api::SearchParams) -> Result<Vec<api::SearchEntry>, api::SearchError> {
+    pub async fn search(&self, params: &api::SearchParams) -> Result<Vec<api::SearchEntry>, api::APIError> {
         self.api.read().await.search(params).await
+    }
+
+    pub async fn mdlist(&self, id: u64) -> Result<api::MDList, api::APIError> {
+        self.api.read().await.mdlist(id).await
     }
 }
