@@ -29,7 +29,7 @@ impl Connection {
                         ipc::Command::LogOut => self.log_out().await?,
                         ipc::Command::AddManga(id, languages) => self.add_manga(id, languages).await?,
                         ipc::Command::Search(params) => self.search(&params).await?,
-                        ipc::Command::MDList(id) => self.mdlist(id).await?
+                        ipc::Command::MDList(params) => self.mdlist(&params).await?
                     };
 
                     response.ipc_send(&mut self.stream).await?;
@@ -133,13 +133,10 @@ impl Connection {
         })
     }
 
-    pub async fn mdlist(&mut self, id: u64) -> std::io::Result<ipc::Response> {
-        Ok(match self.context.mdlist(id).await {
+    pub async fn mdlist(&mut self, params: &api::MDListParams) -> std::io::Result<ipc::Response> {
+        Ok(match self.context.mdlist(params).await {
             Ok(results) => {
-                match &results {
-                    api::MDList::LoggedIn(results) => info!("found {} results for mdlist {:?}", results.len(), id),
-                    api::MDList::NotLoggedIn(results) => info!("found {} results for mdlist (not logged in) {:?}", results.len(), id)
-                };
+                info!("found {} results for mdlist {:?}", results.len(), params.id);
 
                 ipc::Response::MDList(Ok(results))
             },

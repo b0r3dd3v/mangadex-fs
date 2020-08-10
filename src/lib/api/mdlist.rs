@@ -33,57 +33,59 @@ pub struct MDListEntry {
 }
 
 #[derive(Debug)]
-pub struct MDListNotLoggedInEntry {
+pub struct MDListParams {
     pub id: u64,
-    pub title: String,
-    pub status: MDListStatus
+    pub sort_by: api::SortBy
 }
 
-#[derive(Debug)]
-pub enum MDList {
-    LoggedIn(Vec<api::MDListEntry>),
-    NotLoggedIn(Vec<api::MDListNotLoggedInEntry>)
+impl Default for MDListParams {
+    fn default() -> MDListParams {
+        MDListParams {
+            id: 0u64,
+            sort_by: api::SortBy(api::SortMode::Ascending, api::SortParameter::LastUpdated)
+        }
+    }
 }
 
-fn headers(session: &api::MangaDexSession) -> reqwest::header::HeaderMap {
+fn headers(session: &Option<api::MangaDexSession>) -> reqwest::header::HeaderMap {
     let mut headers = reqwest::header::HeaderMap::new();
 
     headers.append(
         reqwest::header::USER_AGENT,
         api::user_agent()
     );
+
+    if let Some(session) = session {
+        headers.append(
+            reqwest::header::COOKIE,
+            reqwest::header::HeaderValue::from_str(&format!("mangadex_session={}", session.id))
+                .unwrap()
+        );
+    }
+
     headers.append(
         reqwest::header::COOKIE,
-        reqwest::header::HeaderValue::from_str(&format!("mangadex_session={}", session.id))
+        reqwest::header::HeaderValue::from_str(&format!("mangadex_title_mode={}", "2"))
             .unwrap()
     );
 
     headers
 }
 
-fn headers_public() -> reqwest::header::HeaderMap {
-    let mut headers = reqwest::header::HeaderMap::new();
+pub async fn mdlist(client: &reqwest::Client, session: &Option<api::MangaDexSession>, params: &MDListParams) -> Result<Vec<MDListEntry>, reqwest::Error> {    
+    let mut url = reqwest::Url::parse("https://mangadex.org/list/").unwrap().join(&params.id.to_string()).unwrap();
 
-    headers.append(
-        reqwest::header::USER_AGENT,
-        api::user_agent()
-    );
-
-    headers
-}
-
-pub async fn mdlist(client: &reqwest::Client, session: &api::MangaDexSession, list_id: u64) -> Result<Vec<MDListEntry>, reqwest::Error> {    
-    api::set_view_mode(client, session, api::ViewMode::SimpleList).await.ok();
-
-    let mut url = reqwest::Url::parse("https://mangadex.org/list/").unwrap().join(&list_id.to_string()).unwrap();
-
-    url.query_pairs_mut().append_pair("s", "0");
+    url.query_pairs_mut().append_pair("s", params.sort_by.encode().to_string().as_str());
 
     let text = client
         .get(url)
         .headers(headers(session))
         .send().await?
         .text().await?;
+
+        use tokio::io::AsyncWriteExt;
+    let mut dump = tokio::fs::File::create("dump").await.unwrap();
+    dump.write_all(text.as_bytes()).await.ok();
 
     let html = scraper::Html::parse_document(text.as_str());
 
@@ -113,18 +115,12 @@ pub async fn mdlist(client: &reqwest::Client, session: &api::MangaDexSession, li
             let status = rows
                 .nth(0)
                 .and_then(|el| {
-                    let span_selector = scraper::Selector::parse("span").unwrap();
-                    let mut spans = el.select(&span_selector);
-
-                    let string = spans
-                        .nth(1)
-                        .map(|span| span
-                            .text()
-                            .fold(String::from(""), |acc, text| acc + text));
-                       
-                    println!("string: {:?}", string);
-                    string
-                }).and_then(|string: String| match string.as_str() {
+                    el.select(&scraper::Selector::parse("button").unwrap())
+                        .into_iter()
+                        .next()
+                        .and_then(|button| button.value().attr("title"))
+                })
+                .and_then(|string: &str| match string {
                     "Reading" => Some(api::MDListStatus::Reading),
                     "Completed" => Some(api::MDListStatus::Completed),
                     "On hold" => Some(api::MDListStatus::OnHold),
@@ -142,56 +138,6 @@ pub async fn mdlist(client: &reqwest::Client, session: &api::MangaDexSession, li
             .unwrap_or(String::from("-")).trim().to_string();
 
             MDListEntry { id, title: title.to_string(), author: author.to_string(), status, last_update }
-        })
-        .collect())
-}
-
-pub async fn mdlist_notloggedin(client: &reqwest::Client, list_id: u64) -> Result<Vec<MDListNotLoggedInEntry>, reqwest::Error> {    
-    let mut url = reqwest::Url::parse("https://mangadex.org/list/").unwrap().join(&list_id.to_string()).unwrap();
-
-    url.query_pairs_mut().append_pair("s", "0");
-
-    let text = client
-        .get(url)
-        .headers(headers_public())
-        .send().await?
-        .text().await?;
-
-    let html = scraper::Html::parse_document(text.as_str());
-
-    Ok(html.select(&scraper::Selector::parse("div#content > div > div.manga-entry").unwrap())
-        .into_iter()
-        .map(|entry_node| {
-            let element = &entry_node.value();
-
-            let id = element.attr("data-id").unwrap().parse::<u64>().unwrap();
-            let title: String = entry_node
-                .select(&scraper::Selector::parse("div > a.manga_title").unwrap())
-                .into_iter()
-                .map(|title_node| title_node.value().attr("title").unwrap())
-                .collect::<Vec<&str>>()
-                .first()
-                .unwrap()
-                .to_string();
-
-            let status = entry_node
-                .select(&scraper::Selector::parse("ul > li > button").unwrap())
-                .into_iter()
-                .map(|status_node| status_node.value().attr("title").unwrap())
-                .collect::<Vec<&str>>()
-                .first()
-                .unwrap()
-                .to_string();
-
-            MDListNotLoggedInEntry { id, title, status: match status.as_str() {
-                "Reading" => MDListStatus::Reading,
-                "Completed" => MDListStatus::Completed,
-                "On hold" => MDListStatus::OnHold,
-                "Plan to read" => MDListStatus::PlanToRead,
-                "Dropped" => MDListStatus::Dropped,
-                "Re-reading" => MDListStatus::ReReading,
-                _ => MDListStatus::PlanToRead
-            } }
         })
         .collect())
 }

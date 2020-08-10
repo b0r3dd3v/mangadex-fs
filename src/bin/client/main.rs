@@ -156,6 +156,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             None => mangadex_fs::api::TagMode::All
                         };
 
+                        if let Some(sort_param_str) = search_args.value_of("sort") {
+                            params.sort_by = mangadex_fs::api::SortBy(
+                                mangadex_fs::api::SortMode::Ascending,
+                                mangadex_fs::api::SortParameter::try_from(sort_param_str).unwrap()
+                            );
+                        }
+                        else if let Some(sort_param_str) = search_args.value_of("sort_descending") {
+                            params.sort_by = mangadex_fs::api::SortBy(
+                                mangadex_fs::api::SortMode::Descending,
+                                mangadex_fs::api::SortParameter::try_from(sort_param_str).unwrap()
+                            );
+                        }
+
                         Ok(params)
                     })();
 
@@ -209,78 +222,64 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"add {}\"", command)))
                 },
                 ("show", Some(show_args)) => match show_args.subcommand() {
-                    ("mdlist", Some(mdlist_args)) => client.mdlist(
-                        mdlist_args.value_of("mdlist_id").unwrap().parse::<u64>().unwrap()
-                    ).await.map(|results| {
-                        match results {
-                            mangadex_fs::api::MDList::LoggedIn(results) => {
-                                if results.len() > 0 {
-                                    let id_max_len = results.iter().fold(0usize, |acc, result| if acc < result.id.to_string().len() { result.id.to_string().len() } else { acc });
-                                    let title_max_len = results.iter().fold(0usize, |acc, result| if acc < result.title.len() { result.title.len() } else { acc });
-                                    let author_max_len: usize = results.iter().fold(0usize, |acc, result| if acc < result.author.len() { result.author.len() } else { acc });
-    
-                                    for result in &results {
-                                        let status = match &result.status {
-                                            mangadex_fs::api::MDListStatus::Completed => result.status.display().bright_blue(),
-                                            mangadex_fs::api::MDListStatus::OnHold => result.status.display().bright_yellow(),
-                                            mangadex_fs::api::MDListStatus::PlanToRead => result.status.display().white(),
-                                            mangadex_fs::api::MDListStatus::Dropped => result.status.display().bright_red(),
-                                            mangadex_fs::api::MDListStatus::Reading => result.status.display().bright_green(),
-                                            mangadex_fs::api::MDListStatus::ReReading => result.status.display().green()
-                                        };
-    
-                                        println!(
-                                            "{id:>0$} {title:<1$} {3} {author:<2$} {3} {status:<15} {3} {last_update}",
-                                            id_max_len, title_max_len, author_max_len, "│".bright_black(),
-                                            id = result.id.to_string().white(),
-                                            title = result.title,
-                                            author = result.author,
-                                            status = status,
-                                            last_update = result.last_update
-                                        );
-                                    }
-    
-                                    if results.len() == 100 {
-                                        println!("{}: MDList returns a maximum of 100 entries, some entries may have been omitted.", "Warning".bright_yellow());
-                                    }
-                                }
-                                else {
-                                    println!("MDList contains no entries or is private.");
-                                }
-                            },
-                            mangadex_fs::api::MDList::NotLoggedIn(results) => {
-                                if results.len() > 0 {
-                                    let id_max_len = results.iter().fold(0usize, |acc, result| if acc < result.id.to_string().len() { result.id.to_string().len() } else { acc });
-                                    let title_max_len = results.iter().fold(0usize, |acc, result| if acc < result.title.chars().count() { result.title.chars().count() } else { acc });
-                                    //let author_max_len: usize = results.iter().fold(0usize, |acc, result| if acc < result.author.chars().count() { result.author.chars().count() } else { acc });
+                    ("mdlist", Some(mdlist_args)) => {
+                        let params = (|| {
+                            let mut params = mangadex_fs::api::MDListParams::default();
 
-                                    for result in &results {
-                                        let status = match result.status {
-                                            mangadex_fs::api::MDListStatus::Completed => result.status.display().bright_blue(),
-                                            mangadex_fs::api::MDListStatus::OnHold => result.status.display().bright_yellow(),
-                                            mangadex_fs::api::MDListStatus::PlanToRead => result.status.display().white(),
-                                            mangadex_fs::api::MDListStatus::Dropped => result.status.display().bright_red(),
-                                            mangadex_fs::api::MDListStatus::Reading => result.status.display().bright_green(),
-                                            mangadex_fs::api::MDListStatus::ReReading => result.status.display().green(),
-                                        };
+                            params.id = mdlist_args.value_of("mdlist_id").unwrap().parse::<u64>().unwrap();
+                            
+                            if let Some(sort_param_str) = mdlist_args.value_of("sort") {
+                                params.sort_by = mangadex_fs::api::SortBy(
+                                    mangadex_fs::api::SortMode::Ascending,
+                                    mangadex_fs::api::SortParameter::try_from(sort_param_str).unwrap()
+                                );
+                            }
+                            else if let Some(sort_param_str) = mdlist_args.value_of("sort_descending") {
+                                params.sort_by = mangadex_fs::api::SortBy(
+                                    mangadex_fs::api::SortMode::Descending,
+                                    mangadex_fs::api::SortParameter::try_from(sort_param_str).unwrap()
+                                );
+                            }
 
-                                        println!(
-                                            "{:>4$} {:<5$} {} {}",
-                                            result.id.to_string().white(), result.title, "│".bright_black(), status,
-                                            id_max_len, title_max_len
-                                        );
-                                    }
-        
-                                    if results.len() == 40 {
-                                        println!("{}: MDList returns a maximum of 40 entries (100 entries when logged in), some entries may have been omitted.", "Warning".bright_yellow());
-                                    }
+                            params
+                        })();
+
+                        client.mdlist(params).await.map(|results| {
+                            if results.len() > 0 {
+                                let id_max_len = results.iter().fold(0usize, |acc, result| if acc < result.id.to_string().len() { result.id.to_string().len() } else { acc });
+                                let title_max_len = results.iter().fold(0usize, |acc, result| if acc < result.title.len() { result.title.len() } else { acc });
+                                let author_max_len: usize = results.iter().fold(0usize, |acc, result| if acc < result.author.len() { result.author.len() } else { acc });
+
+                                for result in &results {
+                                    let status = match &result.status {
+                                        mangadex_fs::api::MDListStatus::Completed => result.status.display().bright_blue(),
+                                        mangadex_fs::api::MDListStatus::OnHold => result.status.display().bright_yellow(),
+                                        mangadex_fs::api::MDListStatus::PlanToRead => result.status.display().white(),
+                                        mangadex_fs::api::MDListStatus::Dropped => result.status.display().bright_red(),
+                                        mangadex_fs::api::MDListStatus::Reading => result.status.display().bright_green(),
+                                        mangadex_fs::api::MDListStatus::ReReading => result.status.display().green()
+                                    };
+
+                                    println!(
+                                        "{id:>0$} {title:<1$} {3} {author:<2$} {3} {status:<15} {3} {last_update}",
+                                        id_max_len, title_max_len, author_max_len, "│".bright_black(),
+                                        id = result.id.to_string().white(),
+                                        title = result.title,
+                                        author = result.author,
+                                        status = status,
+                                        last_update = result.last_update
+                                    );
                                 }
-                                else {
-                                    println!("MDList contains no entries or is private. If MDList is not public, try logging in first.");
+
+                                if results.len() == 100 {
+                                    println!("{}: MDList returns a maximum of 100 entries, some entries may have been omitted.", "Warning".bright_yellow());
                                 }
                             }
-                        }
-                    }),
+                            else {
+                                println!("MDList contains no entries or is private.");
+                            }
+                        })
+                    },
                     (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"add {}\"", command)))
                 },
                 (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"{}\"", command)))

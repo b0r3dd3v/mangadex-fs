@@ -69,8 +69,8 @@ impl Client {
         }
     }
 
-    pub async fn mdlist(&mut self, id: u64) -> ClientResult<api::MDList> {
-        ipc::Command::MDList(id).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+    pub async fn mdlist(&mut self, params: api::MDListParams) -> ClientResult<Vec<api::MDListEntry>> {
+        ipc::Command::MDList(params).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::MDList(Ok(entries))) => Ok(entries),

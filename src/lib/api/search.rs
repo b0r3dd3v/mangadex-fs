@@ -131,6 +131,76 @@ impl Language {
 }
 
 #[derive(Debug)]
+pub enum SortMode {
+    Ascending,
+    Descending
+}
+
+#[derive(Debug)]
+pub enum SortParameter {
+    Title,
+    LastUpdated,
+    Comments,
+    Rating,
+    Views,
+    Follows
+}
+
+impl SortParameter {
+    pub fn try_from(string: &str) -> Option<SortParameter> {
+        match string {
+            "title" => Some(SortParameter::Title),
+            "lastupdated" => Some(SortParameter::LastUpdated),
+            "comments" => Some(SortParameter::Comments),
+            "rating" => Some(SortParameter::Rating),
+            "views" => Some(SortParameter::Views),
+            "follows" => Some(SortParameter::Follows),
+            _ => None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SortBy(pub SortMode, pub SortParameter);
+
+impl SortBy {
+    pub fn encode(&self) -> u8 {
+        match (&self.0, &self.1) {
+            (SortMode::Ascending, SortParameter::Title) => 2u8,
+            (SortMode::Descending, SortParameter::Title) => 3u8,
+            (SortMode::Ascending, SortParameter::LastUpdated) => 0u8,
+            (SortMode::Descending, SortParameter::LastUpdated) => 1u8,
+            (SortMode::Ascending, SortParameter::Comments) => 4u8,
+            (SortMode::Descending, SortParameter::Comments) => 5u8,
+            (SortMode::Ascending, SortParameter::Rating) => 6u8,
+            (SortMode::Descending, SortParameter::Rating) => 7u8,
+            (SortMode::Ascending, SortParameter::Views) => 8u8,
+            (SortMode::Descending, SortParameter::Views) => 9u8,
+            (SortMode::Ascending, SortParameter::Follows) => 10u8,
+            (SortMode::Descending, SortParameter::Follows) => 11u8
+        }
+    }
+
+    pub fn decode(byte: u8) -> Option<SortBy> {
+        match byte {
+            2u8 => Some(SortBy(SortMode::Ascending, SortParameter::Title)),
+            3u8 => Some(SortBy(SortMode::Descending, SortParameter::Title)),
+            0u8 => Some(SortBy(SortMode::Ascending, SortParameter::LastUpdated)),
+            1u8 => Some(SortBy(SortMode::Descending, SortParameter::LastUpdated)),
+            4u8 => Some(SortBy(SortMode::Ascending, SortParameter::Comments)),
+            5u8 => Some(SortBy(SortMode::Descending, SortParameter::Comments)),
+            6u8 => Some(SortBy(SortMode::Ascending, SortParameter::Rating)),
+            7u8 => Some(SortBy(SortMode::Descending, SortParameter::Rating)),
+            8u8 => Some(SortBy(SortMode::Ascending, SortParameter::Views)),
+            9u8 => Some(SortBy(SortMode::Descending, SortParameter::Views)),
+            10u8 => Some(SortBy(SortMode::Ascending, SortParameter::Follows)),
+            11u8 => Some(SortBy(SortMode::Descending, SortParameter::Follows)),
+            _ => None
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct SearchParams {
     pub title: String,
     pub author: Option<String>,
@@ -142,6 +212,7 @@ pub struct SearchParams {
     pub exclude_tag: Vec<api::Genre>,
     pub inclusion_mode: TagMode,
     pub exclusion_mode: TagMode,
+    pub sort_by: SortBy
 }
 
 impl Default for SearchParams {
@@ -156,7 +227,8 @@ impl Default for SearchParams {
             include_tag: vec![],
             exclude_tag: vec![],
             inclusion_mode: TagMode::All,
-            exclusion_mode: TagMode::Any
+            exclusion_mode: TagMode::Any,
+            sort_by: SortBy(SortMode::Ascending, SortParameter::LastUpdated)
         }
     }
 }
@@ -179,6 +251,11 @@ fn headers(session: &api::MangaDexSession) -> reqwest::header::HeaderMap {
     );
     headers.append(
         reqwest::header::COOKIE,
+        reqwest::header::HeaderValue::from_str(&format!("mangadex_title_mode={}", "2"))
+            .unwrap()
+    );
+    headers.append(
+        reqwest::header::COOKIE,
         reqwest::header::HeaderValue::from_str(&format!("mangadex_session={}", session.id))
             .unwrap()
     );
@@ -187,10 +264,9 @@ fn headers(session: &api::MangaDexSession) -> reqwest::header::HeaderMap {
 }
 
 pub async fn search(client: &reqwest::Client, session: &api::MangaDexSession, params: &SearchParams) -> Result<Vec<SearchEntry>, reqwest::Error> {
-    api::set_view_mode(client, session, api::ViewMode::SimpleList).await.ok();
-
     let mut url = reqwest::Url::parse("https://mangadex.org/search/").unwrap();
 
+    url.query_pairs_mut().append_pair("s", params.sort_by.encode().to_string().as_str());
     url.query_pairs_mut().append_pair("title", &params.title);
 
     if let Some(ref author) = params.author { url.query_pairs_mut().append_pair("author", author); }
@@ -258,6 +334,10 @@ pub async fn search(client: &reqwest::Client, session: &api::MangaDexSession, pa
         .send().await?
         .text().await?;
 
+        use tokio::io::AsyncWriteExt;
+    let mut file = tokio::fs::File::create("dump").await.ok().unwrap();
+    file.write_all(text.as_bytes()).await.ok();
+
     let html = scraper::Html::parse_document(text.as_str());
 
     Ok(html.select(&scraper::Selector::parse("div#content > div.manga-entry").unwrap())
@@ -287,17 +367,11 @@ pub async fn search(client: &reqwest::Client, session: &api::MangaDexSession, pa
             let status = rows
                 .nth(0)
                 .and_then(|el| {
-                    let span_selector = scraper::Selector::parse("span").unwrap();
-                    let mut spans = el.select(&span_selector);
-
-                    let string = spans
+                    el.select(&scraper::Selector::parse("span").unwrap())
                         .nth(1)
                         .map(|span| span
                             .text()
-                            .fold(String::from(""), |acc, text| acc + text));
-                       
-                    println!("string: {:?}", string);
-                    string
+                            .fold(String::from(""), |acc, text| acc + text))
                 }).and_then(|string: String| match string.as_str() {
                     "Reading" => Some(api::MDListStatus::Reading),
                     "Completed" => Some(api::MDListStatus::Completed),

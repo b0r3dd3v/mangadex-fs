@@ -130,74 +130,6 @@ impl ipc::IpcTryReceive for api::MDListEntry {
     }
 }
 
-#[async_trait::async_trait]
-impl ipc::IpcSend for api::MDListNotLoggedInEntry {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
-        stream.write_u64(self.id).await?;
-        self.title.ipc_send(stream).await?;
-
-        let status = match &self.status {
-            api::MDListStatus::Reading => 0u8,
-            api::MDListStatus::Completed => 1u8,
-            api::MDListStatus::OnHold => 2u8,
-            api::MDListStatus::PlanToRead => 3u8,
-            api::MDListStatus::Dropped => 4u8,
-            api::MDListStatus::ReReading => 5u8
-        };
-
-        status.ipc_send(stream).await?;
-
-        Ok(())
-    }
-}
-
-#[async_trait::async_trait]
-impl ipc::IpcTryReceive for api::MDListNotLoggedInEntry {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<api::MDListNotLoggedInEntry>> {
-        let id = stream.read_u64().await?;
-        let title = String::ipc_receive(stream).await?;
-
-        let status = match u8::ipc_receive(stream).await? {
-            0u8 => api::MDListStatus::Reading,
-            1u8 => api::MDListStatus::Completed,
-            2u8 => api::MDListStatus::OnHold,
-            3u8 => api::MDListStatus::PlanToRead,
-            4u8 => api::MDListStatus::Dropped,
-            5u8 => api::MDListStatus::ReReading,
-            _ => return Ok(None)
-        };
-
-        Ok(Some(api::MDListNotLoggedInEntry { id, title, status }))
-    }
-}
-
-#[async_trait::async_trait]
-impl ipc::IpcSend for api::MDList {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
-        match self {
-            api::MDList::NotLoggedIn(vec) => {
-                0u8.ipc_send(stream).await?;
-                vec.ipc_send(stream).await
-            },
-            api::MDList::LoggedIn(vec) => {
-                1u8.ipc_send(stream).await?;
-                vec.ipc_send(stream).await
-            }
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl ipc::IpcTryReceive for api::MDList {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<api::MDList>> {
-        Ok(match u8::ipc_receive(stream).await? {
-            0u8 => Vec::<api::MDListNotLoggedInEntry>::ipc_try_receive(stream).await?.map(api::MDList::NotLoggedIn),
-            1u8 => Vec::<api::MDListEntry>::ipc_try_receive(stream).await?.map(api::MDList::LoggedIn),
-            _ => None
-        })
-    }
-}
-
 #[derive(Debug)]
 pub enum Response {
     Kill,
@@ -205,7 +137,7 @@ pub enum Response {
     LogOut(Result<(), String>),
     AddManga(Result<String, String>),
     Search(Result<Vec<api::SearchEntry>, String>),
-    MDList(Result<api::MDList, String>)
+    MDList(Result<Vec<api::MDListEntry>, String>)
 }
 
 #[async_trait::async_trait]
@@ -248,7 +180,7 @@ impl ipc::IpcTryReceive for Response {
             ipc::RESPONSE_LOG_OUT => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::LogOut),
             ipc::RESPONSE_ADD_MANGA => Result::<String, String>::ipc_try_receive(stream).await?.map(Response::AddManga),
             ipc::RESPONSE_SEARCH => Result::<Vec<api::SearchEntry>, String>::ipc_try_receive(stream).await?.map(Response::Search),
-            ipc::RESPONSE_MDLIST => Result::<api::MDList, String>::ipc_try_receive(stream).await?.map(Response::MDList),
+            ipc::RESPONSE_MDLIST => Result::<Vec<api::MDListEntry>, String>::ipc_try_receive(stream).await?.map(Response::MDList),
             byte => {
                 warn!("received unknown response byte: {}", byte);
                 None

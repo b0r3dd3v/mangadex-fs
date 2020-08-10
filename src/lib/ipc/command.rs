@@ -7,6 +7,29 @@ use ipc::{IpcReceive};
 use std::convert::TryFrom;
 
 #[async_trait::async_trait]
+impl ipc::IpcSend for api::MDListParams {
+    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+        stream.write_u64(self.id).await?;
+        self.sort_by.encode().ipc_send(stream).await
+    }
+}
+
+#[async_trait::async_trait]
+impl ipc::IpcTryReceive for api::MDListParams {
+    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+        let mut params = api::MDListParams::default();
+
+        params.id = stream.read_u64().await?;
+        params.sort_by =  match api::SortBy::decode(u8::ipc_receive(stream).await?) {
+            Some(sort_by) => sort_by,
+            None => return Ok(None)
+        };
+
+        Ok(Some(params))
+    }
+}
+
+#[async_trait::async_trait]
 impl ipc::IpcSend for api::SearchParams {
     async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
         self.title.ipc_send(stream).await?;
@@ -37,7 +60,9 @@ impl ipc::IpcSend for api::SearchParams {
             (api::TagMode::Any, api::TagMode::Any) => 3u8,
         };
 
-        tag_mode.ipc_send(stream).await
+        tag_mode.ipc_send(stream).await?;
+
+        self.sort_by.encode().ipc_send(stream).await
     }
 }
 
@@ -130,6 +155,11 @@ impl ipc::IpcTryReceive for api::SearchParams {
         params.exclusion_mode = exclusion_mode;
         debug!("mode: {:?} {:?}", params.inclusion_mode, params.exclusion_mode);
 
+        params.sort_by = match api::SortBy::decode(u8::ipc_receive(stream).await?) {
+            Some(sort_by) => sort_by,
+            None => return Ok(None)
+        };
+
         Ok(Some(params))
     }
 }
@@ -142,7 +172,7 @@ pub enum Command {
     LogOut,
     AddManga(u64, Vec<String>),
     Search(api::SearchParams),
-    MDList(u64)
+    MDList(api::MDListParams)
 }
 
 #[async_trait::async_trait]
@@ -168,9 +198,9 @@ impl ipc::IpcSend for Command {
                 stream.write_u8(ipc::COMMAND_SEARCH).await?;
                 params.ipc_send(stream).await
             },
-            Command::MDList(id) => {
+            Command::MDList(params) => {
                 stream.write_u8(ipc::COMMAND_MDLIST).await?;
-                stream.write_u64(*id).await
+                params.ipc_send(stream).await
             }
         }
     }
@@ -186,7 +216,7 @@ impl ipc::IpcTryReceive for Command {
             ipc::COMMAND_LOG_OUT => Some(Command::LogOut),
             ipc::COMMAND_ADD_MANGA => Some(Command::AddManga(stream.read_u64().await?, Vec::<String>::ipc_receive(stream).await?)),
             ipc::COMMAND_SEARCH => api::SearchParams::ipc_try_receive(stream).await?.map(Command::Search),
-            ipc::COMMAND_MDLIST => Some(Command::MDList(stream.read_u64().await?)),
+            ipc::COMMAND_MDLIST => api::MDListParams::ipc_try_receive(stream).await?.map(Command::MDList),
             byte => {
                 warn!("received unknown command byte: {}", byte);
                 None

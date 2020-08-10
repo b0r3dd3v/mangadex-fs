@@ -73,10 +73,7 @@ impl MangaDexAPI {
         }
     }
 
-    pub async fn mdlist(&self, id: u64) -> Result<api::MDList, api::APIError> {
-        match &self.session {
-            Some(session) => api::mdlist(&self.client, &session, id).await.map(api::MDList::LoggedIn).map_err(APIError::Request),
-            None => api::mdlist_notloggedin(&self.client, id).await.map(api::MDList::NotLoggedIn).map_err(APIError::Request),
-        }
+    pub async fn mdlist(&self, params: &api::MDListParams) -> Result<Vec<api::MDListEntry>, api::APIError> {
+        api::mdlist(&self.client, &self.session, params).await.map_err(APIError::Request)
     }
 }

@@ -316,7 +316,7 @@ impl Context {
         self.api.read().await.search(params).await
     }
 
-    pub async fn mdlist(&self, id: u64) -> Result<api::MDList, api::APIError> {
-        self.api.read().await.mdlist(id).await
+    pub async fn mdlist(&self, params: &api::MDListParams) -> Result<Vec<api::MDListEntry>, api::APIError> {
+        self.api.read().await.mdlist(params).await
     }
 }
