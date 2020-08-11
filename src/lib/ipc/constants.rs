@@ -18,3 +18,10 @@ pub const RESULT_ERR: u8 = 1u8;
 
 pub const OPTION_SOME: u8 = 0u8;
 pub const OPTION_NONE: u8 = 1u8;
+
+pub const MDLIST_STATUS_READING: u8 = 0u8;
+pub const MDLIST_STATUS_COMPLETED: u8 = 1u8;
+pub const MDLIST_STATUS_ON_HOLD: u8 = 2u8;
+pub const MDLIST_STATUS_PLAN_TO_READ: u8 = 3u8;
+pub const MDLIST_STATUS_DROPPED: u8 = 4u8;
+pub const MDLIST_STATUS_RE_READING: u8 = 5u8;

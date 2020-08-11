@@ -6,6 +6,7 @@ pub struct Client {
     stream: tokio::net::UnixStream
 }
 
+#[derive(Debug)]
 pub enum ClientError {
     IO(std::io::Error),
     Message(String)

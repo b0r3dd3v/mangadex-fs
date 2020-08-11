@@ -21,6 +21,29 @@ impl MDListStatus {
             MDListStatus::ReReading => "Re-reading"
         }
     }
+
+    pub fn encode(&self) -> u8 {
+        match self {
+            MDListStatus::Reading => 1u8,
+            MDListStatus::Completed => 2u8,
+            MDListStatus::OnHold => 3u8,
+            MDListStatus::PlanToRead => 4u8,
+            MDListStatus::Dropped => 5u8,
+            MDListStatus::ReReading => 6u8
+        }
+    }
+
+    pub fn decode(byte: u8) -> Option<MDListStatus> {
+        match byte {
+            1u8 => Some(MDListStatus::Reading),
+            2u8 => Some(MDListStatus::Completed),
+            3u8 => Some(MDListStatus::OnHold),
+            4u8 => Some(MDListStatus::PlanToRead),
+            5u8 => Some(MDListStatus::Dropped),
+            6u8 => Some(MDListStatus::ReReading),
+            _ => None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -35,14 +58,16 @@ pub struct MDListEntry {
 #[derive(Debug)]
 pub struct MDListParams {
     pub id: u64,
-    pub sort_by: api::SortBy
+    pub sort_by: api::SortBy,
+    pub status: Option<MDListStatus>
 }
 
 impl Default for MDListParams {
     fn default() -> MDListParams {
         MDListParams {
             id: 0u64,
-            sort_by: api::SortBy(api::SortMode::Ascending, api::SortParameter::LastUpdated)
+            sort_by: api::SortBy(api::SortMode::Ascending, api::SortParameter::LastUpdated),
+            status: None
         }
     }
 }
@@ -73,8 +98,18 @@ fn headers(session: &Option<api::MangaDexSession>) -> reqwest::header::HeaderMap
 }
 
 pub async fn mdlist(client: &reqwest::Client, session: &Option<api::MangaDexSession>, params: &MDListParams) -> Result<Vec<MDListEntry>, reqwest::Error> {    
-    let mut url = reqwest::Url::parse("https://mangadex.org/list/").unwrap().join(&params.id.to_string()).unwrap();
-
+    let mut url = reqwest::Url::parse("https://mangadex.org/list/").unwrap()
+        .join(&format!(
+            "{}/{}",
+            &params.id.to_string(),
+            &params.status
+                .as_ref()
+                .map(|status| status.encode())
+                .unwrap_or(0u8)
+                .to_string()
+        ))
+        .unwrap();
+        
     url.query_pairs_mut().append_pair("s", params.sort_by.encode().to_string().as_str());
 
     let text = client

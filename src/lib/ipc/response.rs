@@ -39,12 +39,12 @@ impl ipc::IpcSend for api::SearchEntry {
         self.author.ipc_send(stream).await?;
         let status = match &self.status {
             Some(status) => Some(match status {
-                api::MDListStatus::Reading => 0u8,
-                api::MDListStatus::Completed => 1u8,
-                api::MDListStatus::OnHold => 2u8,
-                api::MDListStatus::PlanToRead => 3u8,
-                api::MDListStatus::Dropped => 4u8,
-                api::MDListStatus::ReReading => 5u8
+                api::MDListStatus::Reading => ipc::MDLIST_STATUS_READING,
+                api::MDListStatus::Completed => ipc::MDLIST_STATUS_COMPLETED,
+                api::MDListStatus::OnHold => ipc::MDLIST_STATUS_ON_HOLD,
+                api::MDListStatus::PlanToRead => ipc::MDLIST_STATUS_PLAN_TO_READ,
+                api::MDListStatus::Dropped => ipc::MDLIST_STATUS_DROPPED,
+                api::MDListStatus::ReReading => ipc::MDLIST_STATUS_RE_READING
             }),
             None => None
         };
@@ -64,12 +64,12 @@ impl ipc::IpcTryReceive for api::SearchEntry {
         let status = match Option::<u8>::ipc_try_receive(stream).await? {
             Some(status) => match status {
                 Some(byte) => Some(match byte {
-                    0u8 => api::MDListStatus::Reading,
-                    1u8 => api::MDListStatus::Completed,
-                    2u8 => api::MDListStatus::OnHold,
-                    3u8 => api::MDListStatus::PlanToRead,
-                    4u8 => api::MDListStatus::Dropped,
-                    5u8 => api::MDListStatus::ReReading,
+                    ipc::MDLIST_STATUS_READING => api::MDListStatus::Reading,
+                    ipc::MDLIST_STATUS_COMPLETED => api::MDListStatus::Completed,
+                    ipc::MDLIST_STATUS_ON_HOLD => api::MDListStatus::OnHold,
+                    ipc::MDLIST_STATUS_PLAN_TO_READ => api::MDListStatus::PlanToRead,
+                    ipc::MDLIST_STATUS_DROPPED => api::MDListStatus::Dropped,
+                    ipc::MDLIST_STATUS_RE_READING => api::MDListStatus::ReReading,
                     _ => return Ok(None)
                 }),
                 _ => None
@@ -92,12 +92,12 @@ impl ipc::IpcSend for api::MDListEntry {
         self.author.ipc_send(stream).await?;
 
         let status = match &self.status {
-            api::MDListStatus::Reading => 0u8,
-            api::MDListStatus::Completed => 1u8,
-            api::MDListStatus::OnHold => 2u8,
-            api::MDListStatus::PlanToRead => 3u8,
-            api::MDListStatus::Dropped => 4u8,
-            api::MDListStatus::ReReading => 5u8
+            api::MDListStatus::Reading => ipc::MDLIST_STATUS_READING,
+            api::MDListStatus::Completed => ipc::MDLIST_STATUS_COMPLETED,
+            api::MDListStatus::OnHold => ipc::MDLIST_STATUS_ON_HOLD,
+            api::MDListStatus::PlanToRead => ipc::MDLIST_STATUS_PLAN_TO_READ,
+            api::MDListStatus::Dropped => ipc::MDLIST_STATUS_DROPPED,
+            api::MDListStatus::ReReading => ipc::MDLIST_STATUS_RE_READING
         };
 
         status.ipc_send(stream).await?;
@@ -115,12 +115,12 @@ impl ipc::IpcTryReceive for api::MDListEntry {
         let author = String::ipc_receive(stream).await?;
 
         let status = match u8::ipc_receive(stream).await? {
-            0u8 => api::MDListStatus::Reading,
-            1u8 => api::MDListStatus::Completed,
-            2u8 => api::MDListStatus::OnHold,
-            3u8 => api::MDListStatus::PlanToRead,
-            4u8 => api::MDListStatus::Dropped,
-            5u8 => api::MDListStatus::ReReading,
+            ipc::MDLIST_STATUS_READING => api::MDListStatus::Reading,
+            ipc::MDLIST_STATUS_COMPLETED => api::MDListStatus::Completed,
+            ipc::MDLIST_STATUS_ON_HOLD => api::MDListStatus::OnHold,
+            ipc::MDLIST_STATUS_PLAN_TO_READ => api::MDListStatus::PlanToRead,
+            ipc::MDLIST_STATUS_DROPPED => api::MDListStatus::Dropped,
+            ipc::MDLIST_STATUS_RE_READING => api::MDListStatus::ReReading,
             _ => return Ok(None)
         };
 

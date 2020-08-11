@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ("kill", _) => client.kill().await,
                 ("login", Some(login_args)) => client.log_in(login_args.value_of("username").unwrap(), login_args.value_of("password").unwrap()).await.map(|session| {
                     if login_args.is_present("show") {
-                        println!("{}: {}\n{}: {}", "session", session.id.cyan(), "rememberme_token", session.remember_me_token.cyan());
+                        println!("{}: {}\n{}: {}", "session".white(), session.id, "rememberme_token".white(), session.remember_me_token);
                     }
                 }),
                 ("logout", _) => client.log_out().await,
@@ -153,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     _ => return Err(ipc::ClientError::Message(format!("Failed to parse tag inclusion mode argument: \"{}\"", value)))
                                 }
                             },
-                            None => mangadex_fs::api::TagMode::All
+                            None => mangadex_fs::api::TagMode::Any
                         };
 
                         if let Some(sort_param_str) = search_args.value_of("sort") {
@@ -241,44 +241,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 );
                             }
 
-                            params
+                            if let Some(status_param_str) = mdlist_args.value_of("status") {
+                                params.status = match status_param_str {
+                                    "reading" => Some(mangadex_fs::api::MDListStatus::Reading),
+                                    "completed" => Some(mangadex_fs::api::MDListStatus::Completed),
+                                    "onhold" => Some(mangadex_fs::api::MDListStatus::OnHold),
+                                    "dropped" => Some(mangadex_fs::api::MDListStatus::Dropped),
+                                    "plantoread" => Some(mangadex_fs::api::MDListStatus::PlanToRead),
+                                    "rereading" => Some(mangadex_fs::api::MDListStatus::ReReading),
+                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse status argument: \"{}\"", status_param_str)))
+                                };
+                            }
+
+                            Ok(params)
                         })();
 
-                        client.mdlist(params).await.map(|results| {
-                            if results.len() > 0 {
-                                let id_max_len = results.iter().fold(0usize, |acc, result| if acc < result.id.to_string().len() { result.id.to_string().len() } else { acc });
-                                let title_max_len = results.iter().fold(0usize, |acc, result| if acc < result.title.len() { result.title.len() } else { acc });
-                                let author_max_len: usize = results.iter().fold(0usize, |acc, result| if acc < result.author.len() { result.author.len() } else { acc });
+                        println!("params: {:?}", params);
 
-                                for result in &results {
-                                    let status = match &result.status {
-                                        mangadex_fs::api::MDListStatus::Completed => result.status.display().bright_blue(),
-                                        mangadex_fs::api::MDListStatus::OnHold => result.status.display().bright_yellow(),
-                                        mangadex_fs::api::MDListStatus::PlanToRead => result.status.display().white(),
-                                        mangadex_fs::api::MDListStatus::Dropped => result.status.display().bright_red(),
-                                        mangadex_fs::api::MDListStatus::Reading => result.status.display().bright_green(),
-                                        mangadex_fs::api::MDListStatus::ReReading => result.status.display().green()
-                                    };
+                        match params {
+                            Ok(params) => client.mdlist(params).await.map(|results| {
+                                
+                                if results.len() > 0 {
+                                    let id_max_len = results.iter().fold(0usize, |acc, result| if acc < result.id.to_string().len() { result.id.to_string().len() } else { acc });
+                                    let title_max_len = results.iter().fold(0usize, |acc, result| if acc < result.title.len() { result.title.len() } else { acc });
+                                    let author_max_len: usize = results.iter().fold(0usize, |acc, result| if acc < result.author.len() { result.author.len() } else { acc });
 
-                                    println!(
-                                        "{id:>0$} {title:<1$} {3} {author:<2$} {3} {status:<15} {3} {last_update}",
-                                        id_max_len, title_max_len, author_max_len, "│".bright_black(),
-                                        id = result.id.to_string().white(),
-                                        title = result.title,
-                                        author = result.author,
-                                        status = status,
-                                        last_update = result.last_update
-                                    );
+                                    for result in &results {
+                                        let status = match &result.status {
+                                            mangadex_fs::api::MDListStatus::Completed => result.status.display().bright_blue(),
+                                            mangadex_fs::api::MDListStatus::OnHold => result.status.display().bright_yellow(),
+                                            mangadex_fs::api::MDListStatus::PlanToRead => result.status.display().white(),
+                                            mangadex_fs::api::MDListStatus::Dropped => result.status.display().bright_red(),
+                                            mangadex_fs::api::MDListStatus::Reading => result.status.display().bright_green(),
+                                            mangadex_fs::api::MDListStatus::ReReading => result.status.display().green()
+                                        };
+
+                                        println!(
+                                            "{id:>0$} {title:<1$} {3} {author:<2$} {3} {status:<15} {3} {last_update}",
+                                            id_max_len, title_max_len, author_max_len, "│".bright_black(),
+                                            id = result.id.to_string().white(),
+                                            title = result.title,
+                                            author = result.author,
+                                            status = status,
+                                            last_update = result.last_update
+                                        );
+                                    }
+
+                                    if results.len() == 100 {
+                                        println!("{}: MDList returns a maximum of 100 entries, some entries may have been omitted.", "Warning".bright_yellow());
+                                    }
                                 }
-
-                                if results.len() == 100 {
-                                    println!("{}: MDList returns a maximum of 100 entries, some entries may have been omitted.", "Warning".bright_yellow());
+                                else {
+                                    println!("MDList contains no entries or is private.");
                                 }
-                            }
-                            else {
-                                println!("MDList contains no entries or is private.");
-                            }
-                        })
+                            }),
+                            Err(err) => Err(err)
+                        }
                     },
                     (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"add {}\"", command)))
                 },

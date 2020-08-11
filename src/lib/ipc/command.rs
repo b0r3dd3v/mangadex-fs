@@ -10,7 +10,8 @@ use std::convert::TryFrom;
 impl ipc::IpcSend for api::MDListParams {
     async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
         stream.write_u64(self.id).await?;
-        self.sort_by.encode().ipc_send(stream).await
+        self.sort_by.encode().ipc_send(stream).await?;
+        self.status.as_ref().map(|status| status.encode()).ipc_send(stream).await
     }
 }
 
@@ -22,6 +23,17 @@ impl ipc::IpcTryReceive for api::MDListParams {
         params.id = stream.read_u64().await?;
         params.sort_by =  match api::SortBy::decode(u8::ipc_receive(stream).await?) {
             Some(sort_by) => sort_by,
+            None => return Ok(None)
+        };
+
+        params.status =  match Option::<u8>::ipc_try_receive(stream).await? {
+            Some(option) => match option {
+                Some(byte) => match api::MDListStatus::decode(byte) {
+                    Some(status) => Some(status),
+                    None => return Ok(None)
+                },
+                None => None
+            },
             None => return Ok(None)
         };
 
