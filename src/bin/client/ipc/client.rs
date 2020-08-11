@@ -103,4 +103,24 @@ impl Client {
             _ => Err(ClientError::Message("unexpected daemon response".into()))
         }
     }
+
+    pub async fn mark_chapter_read(&mut self, id: u64) -> ClientResult<()> {
+        ipc::Command::MarkChapterRead(id).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+
+        match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
+            Some(ipc::Response::MarkChapterRead(Ok(_))) => Ok(()),
+            Some(ipc::Response::MarkChapterRead(Err(failure))) => Err(ClientError::Message(failure)),
+            _ => Err(ClientError::Message("unexpected daemon response".into()))
+        }
+    }
+
+    pub async fn mark_chapter_unread(&mut self, id: u64) -> ClientResult<()> {
+        ipc::Command::MarkChapterUnread(id).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+
+        match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
+            Some(ipc::Response::MarkChapterUnread(Ok(_))) => Ok(()),
+            Some(ipc::Response::MarkChapterUnread(Err(failure))) => Err(ClientError::Message(failure)),
+            _ => Err(ClientError::Message("unexpected daemon response".into()))
+        }
+    }
 }

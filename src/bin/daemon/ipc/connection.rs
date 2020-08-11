@@ -31,7 +31,9 @@ impl Connection {
                         ipc::Command::Search(params) => self.search(&params).await?,
                         ipc::Command::MDList(params) => self.mdlist(&params).await?,
                         ipc::Command::FollowManga(id, status) => self.follow(id, &status).await?,
-                        ipc::Command::UnfollowManga(id) => self.unfollow(id).await?
+                        ipc::Command::UnfollowManga(id) => self.unfollow(id).await?,
+                        ipc::Command::MarkChapterRead(id) => self.mark_chapter_read(id).await?,
+                        ipc::Command::MarkChapterUnread(id) => self.mark_chapter_unread(id).await?
                     };
 
                     response.ipc_send(&mut self.stream).await?;
@@ -177,6 +179,39 @@ impl Connection {
                 match error {
                     api::APIError::Request(_) => ipc::Response::UnfollowManga(Err("request error".into())),
                     api::APIError::NotLoggedIn => ipc::Response::UnfollowManga(Err("you need to be logged in to use this command".into()))
+                }
+            }
+        })
+    }
+
+
+    pub async fn mark_chapter_read(&mut self, id: u64) -> std::io::Result<ipc::Response> {
+        Ok(match self.context.mark_chapter_read(id).await {
+            Ok(_) => {
+                ipc::Response::MarkChapterRead(Ok(()))
+            },
+            Err(error) => {
+                warn!("unfollow error: {:?}", error);
+                
+                match error {
+                    api::APIError::Request(_) => ipc::Response::MarkChapterRead(Err("request error".into())),
+                    api::APIError::NotLoggedIn => ipc::Response::MarkChapterRead(Err("you need to be logged in to use this command".into()))
+                }
+            }
+        })
+    }
+
+    pub async fn mark_chapter_unread(&mut self, id: u64) -> std::io::Result<ipc::Response> {
+        Ok(match self.context.mark_chapter_unread(id).await {
+            Ok(_) => {
+                ipc::Response::MarkChapterUnread(Ok(()))
+            },
+            Err(error) => {
+                warn!("unfollow error: {:?}", error);
+                
+                match error {
+                    api::APIError::Request(_) => ipc::Response::MarkChapterUnread(Err("request error".into())),
+                    api::APIError::NotLoggedIn => ipc::Response::MarkChapterUnread(Err("you need to be logged in to use this command".into()))
                 }
             }
         })

@@ -186,7 +186,9 @@ pub enum Command {
     Search(api::SearchParams),
     MDList(api::MDListParams),
     FollowManga(u64, api::MDListStatus),
-    UnfollowManga(u64)
+    UnfollowManga(u64),
+    MarkChapterRead(u64),
+    MarkChapterUnread(u64)
 }
 
 #[async_trait::async_trait]
@@ -224,6 +226,14 @@ impl ipc::IpcSend for Command {
             Command::UnfollowManga(id) => {
                 stream.write_u8(ipc::COMMAND_UNFOLLOW_MANGA).await?;
                 stream.write_u64(*id).await
+            },
+            Command::MarkChapterRead(id) => {
+                stream.write_u8(ipc::COMMAND_MARK_CHAPTER_READ).await?;
+                stream.write_u64(*id).await
+            },
+            Command::MarkChapterUnread(id) => {
+                stream.write_u8(ipc::COMMAND_MARK_CHAPTER_UNREAD).await?;
+                stream.write_u64(*id).await
             }
         }
     }
@@ -247,6 +257,8 @@ impl ipc::IpcTryReceive for Command {
                 api::MDListStatus::decode(status).and_then(|status| Some(Command::FollowManga(id, status)))
             },
             ipc::COMMAND_UNFOLLOW_MANGA => Some(Command::UnfollowManga(stream.read_u64().await?)),
+            ipc::COMMAND_MARK_CHAPTER_READ => Some(Command::MarkChapterRead(stream.read_u64().await?)),
+            ipc::COMMAND_MARK_CHAPTER_UNREAD => Some(Command::MarkChapterUnread(stream.read_u64().await?)),
             byte => {
                 warn!("received unknown command byte: {}", byte);
                 None

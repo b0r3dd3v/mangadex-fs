@@ -91,4 +91,18 @@ impl MangaDexAPI {
             None => Err(APIError::NotLoggedIn)
         }
     }
+
+    pub async fn mark_chapter_read(&self, id: u64) -> Result<(), api::APIError> {
+        match &self.session {
+            Some(session) => api::mark_chapter_read(&self.client, &session, id).await.map_err(APIError::Request),
+            None => Err(APIError::NotLoggedIn)
+        }
+    }
+
+    pub async fn mark_chapter_unread(&self, id: u64) -> Result<(), api::APIError> {
+        match &self.session {
+            Some(session) => api::mark_chapter_unread(&self.client, &session, id).await.map_err(APIError::Request),
+            None => Err(APIError::NotLoggedIn)
+        }
+    }
 }

@@ -10,6 +10,7 @@ pub mod page;
 pub mod mdlist;
 pub mod follow;
 pub mod unfollow;
+pub mod mark_chapter;
 
 pub use session::*;
 pub use manga::*;
@@ -23,3 +24,4 @@ pub use page::*;
 pub use mdlist::*;
 pub use follow::*;
 pub use unfollow::*;
+pub use mark_chapter::*;

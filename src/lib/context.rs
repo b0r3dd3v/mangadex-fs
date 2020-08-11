@@ -327,4 +327,13 @@ impl Context {
     pub async fn unfollow(&self, id: u64) -> Result<(), api::APIError> {
         self.api.read().await.unfollow(id).await
     }
+
+
+    pub async fn mark_chapter_read(&self, id: u64) -> Result<(), api::APIError> {
+        self.api.read().await.mark_chapter_read(id).await
+    }
+
+    pub async fn mark_chapter_unread(&self, id: u64) -> Result<(), api::APIError> {
+        self.api.read().await.mark_chapter_unread(id).await
+    }
 }

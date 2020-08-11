@@ -212,6 +212,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err(err) => Err(err)
                     }
                 },
+                ("chapter", Some(chapter_args)) => match chapter_args.subcommand() {
+                    ("mark", Some(mark_args)) => {
+                        if "read" == mark_args.value_of("status").unwrap() {
+                            client.mark_chapter_read(mark_args.value_of("chapter_id").unwrap().parse::<u64>().unwrap()).await
+                        }
+                        else {
+                            client.mark_chapter_unread(mark_args.value_of("chapter_id").unwrap().parse::<u64>().unwrap()).await
+                        }
+                    },
+                    (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"chapter {}\"", command)))
+                },
                 ("manga", Some(manga_args)) => match manga_args.subcommand() {
                     ("add", Some(add_args)) => client.add_manga(
                         add_args.value_of("manga_id").unwrap().parse::<u64>().unwrap(),
