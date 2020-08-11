@@ -33,7 +33,8 @@ impl Connection {
                         ipc::Command::FollowManga(id, status) => self.follow(id, &status).await?,
                         ipc::Command::UnfollowManga(id) => self.unfollow(id).await?,
                         ipc::Command::MarkChapterRead(id) => self.mark_chapter_read(id).await?,
-                        ipc::Command::MarkChapterUnread(id) => self.mark_chapter_unread(id).await?
+                        ipc::Command::MarkChapterUnread(id) => self.mark_chapter_unread(id).await?,
+                        ipc::Command::Follows => self.follows().await?
                     };
 
                     response.ipc_send(&mut self.stream).await?;
@@ -212,6 +213,22 @@ impl Connection {
                 match error {
                     api::APIError::Request(_) => ipc::Response::MarkChapterUnread(Err("request error".into())),
                     api::APIError::NotLoggedIn => ipc::Response::MarkChapterUnread(Err("you need to be logged in to use this command".into()))
+                }
+            }
+        })
+    }
+
+    pub async fn follows(&mut self) -> std::io::Result<ipc::Response> {
+        Ok(match self.context.follows().await {
+            Ok(follows) => {
+                ipc::Response::Follows(Ok(follows))
+            },
+            Err(error) => {
+                warn!("follows error: {:?}", error);
+                
+                match error {
+                    api::APIError::Request(_) => ipc::Response::Follows(Err("request error".into())),
+                    api::APIError::NotLoggedIn => ipc::Response::Follows(Err("you need to be logged in to use this command".into()))
                 }
             }
         })

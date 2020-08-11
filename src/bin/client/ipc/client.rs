@@ -123,4 +123,14 @@ impl Client {
             _ => Err(ClientError::Message("unexpected daemon response".into()))
         }
     }
+
+    pub async fn follows(&mut self) -> ClientResult<Vec<api::FollowsEntry>> {
+        ipc::Command::Follows.ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+
+        match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
+            Some(ipc::Response::Follows(Ok(follows))) => Ok(follows),
+            Some(ipc::Response::Follows(Err(failure))) => Err(ClientError::Message(failure)),
+            _ => Err(ClientError::Message("unexpected daemon response".into()))
+        }
+    }
 }

@@ -105,4 +105,11 @@ impl MangaDexAPI {
             None => Err(APIError::NotLoggedIn)
         }
     }
+
+    pub async fn follows(&self) -> Result<Vec<api::FollowsEntry>, api::APIError> {
+        match &self.session {
+            Some(session) => api::follows(&self.client, &session).await.map_err(APIError::Request),
+            None => Err(APIError::NotLoggedIn)
+        }
+    }
 }

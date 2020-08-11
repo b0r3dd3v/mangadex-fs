@@ -9,6 +9,7 @@ pub const COMMAND_FOLLOW_MANGA: u8 = 7u8;
 pub const COMMAND_UNFOLLOW_MANGA: u8 = 8u8;
 pub const COMMAND_MARK_CHAPTER_READ: u8 = 9u8;
 pub const COMMAND_MARK_CHAPTER_UNREAD: u8 = 10u8;
+pub const COMMAND_FOLLOWS: u8 = 11u8;
 
 pub const RESPONSE_KILL: u8 = 1u8;
 pub const RESPONSE_LOG_IN: u8 = 2u8;
@@ -20,6 +21,7 @@ pub const RESPONSE_FOLLOW_MANGA: u8 = 7u8;
 pub const RESPONSE_UNFOLLOW_MANGA: u8 = 8u8;
 pub const RESPONSE_MARK_CHAPTER_READ: u8 = 9u8;
 pub const RESPONSE_MARK_CHAPTER_UNREAD: u8 = 10u8;
+pub const RESPONSE_FOLLOWS: u8 = 11u8;
 
 pub const RESULT_OK: u8 = 0u8;
 pub const RESULT_ERR: u8 = 1u8;

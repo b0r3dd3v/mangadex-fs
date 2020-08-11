@@ -278,6 +278,8 @@ pub fn client<'a, 'b>() -> clap::App<'a, 'b> {
                     .takes_value(true)
                     .required(true)
                     .possible_values(&["read", "unread"]))))
+        .subcommand(clap::SubCommand::with_name("follows")
+            .about("Returns the latest updates of followed manga"))
         .subcommand(clap::SubCommand::with_name("manga")
             .subcommand(clap::SubCommand::with_name("add")
                 .about("Adds a manga")

@@ -359,6 +359,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                     (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"add {}\"", command)))
                 },
+                ("follows", Some(follow_args)) => {
+                    client.follows().await.map(|results| {
+                        if results.len() > 0 {
+                            let format_chapter = |entry: &mangadex_fs::api::FollowsEntry| {
+                                match (entry.chapter_title.is_empty(), entry.chapter_volume.is_empty()) {
+                                    (true, true) => sanitize_filename::sanitize(format!("Ch. {}", entry.chapter)),
+                                    (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {}", entry.chapter_volume, entry.chapter)),
+                                    (false, true) => sanitize_filename::sanitize(format!("Ch. {} - {}", entry.chapter, entry.chapter_title)),
+                                    _ => sanitize_filename::sanitize(format!(
+                                        "Vol. {} Ch. {} - {}",
+                                        entry.chapter_volume, entry.chapter, entry.chapter_title
+                                    ))
+                                }
+                            };
+
+                            let manga_id_max_len = results.iter().fold(0usize, |acc, result| if acc < result.manga_id.to_string().len() { result.manga_id.to_string().len() } else { acc });
+                            let manga_title_max_len = results.iter().fold(0usize, |acc, result| if acc < result.manga_title.len() { result.manga_title.len() } else { acc });
+                            let chapter_id_max_len: usize = results.iter().fold(0usize, |acc, result| if acc < result.chapter_id.to_string().len() { result.chapter_id.to_string().len() } else { acc });
+                            let chapter_max_len: usize = results.iter().fold(0usize, |acc, result| if acc < format_chapter(result).len() { format_chapter(result).len() } else { acc });
+
+
+                            for result in &results {
+                                println!(
+                                    "{manga_id:>0$} {manga_title:<1$} {4} {chapter_id:<2$} {chapter_formatted:<3$} {4} {read:<8} {4} {last_update}",
+                                    manga_id_max_len, manga_title_max_len, chapter_id_max_len, chapter_max_len, "│".bright_black(),
+                                    manga_id = result.manga_id.to_string().white(),
+                                    manga_title = result.manga_title,
+                                    chapter_id = result.chapter_id.to_string().white(),
+                                    chapter_formatted = format_chapter(result),
+                                    read = if result.marked_read { "Read".white() } else { "Not read".bright_green() },
+                                    last_update = result.last_update
+                                );
+                            }
+                        }
+                        else {
+                            println!("Follows contains no entries.");
+                        }
+                    })
+                },
                 (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"{}\"", command)))
             };
 

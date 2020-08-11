@@ -336,4 +336,8 @@ impl Context {
     pub async fn mark_chapter_unread(&self, id: u64) -> Result<(), api::APIError> {
         self.api.read().await.mark_chapter_unread(id).await
     }
+
+    pub async fn follows(&self) -> Result<Vec<api::FollowsEntry>, api::APIError> {
+        self.api.read().await.follows().await
+    }
 }

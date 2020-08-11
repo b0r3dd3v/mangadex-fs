@@ -20,6 +20,56 @@ impl ipc::IpcReceive for api::MangaDexSession {
         })
     }
 }
+/*
+
+    pub manga_id: u64,
+    pub manga_title: String,
+    pub chapter_id: u64,
+    pub chapter: String,
+    pub chapter_title: String,
+    pub marked_read: bool,
+    pub last_update: String
+    */
+#[async_trait::async_trait]
+impl ipc::IpcSend for api::FollowsEntry {
+    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+        stream.write_u64(self.manga_id).await?;
+        self.manga_title.ipc_send(stream).await?;
+        stream.write_u64(self.chapter_id).await?;
+        self.chapter.ipc_send(stream).await?;
+        self.chapter_title.ipc_send(stream).await?;
+        self.chapter_volume.ipc_send(stream).await?;
+        if self.marked_read {
+            stream.write_u8(1u8).await?;
+        }
+        else {
+            stream.write_u8(0u8).await?;
+        }
+        self.last_update.ipc_send(stream).await
+    }
+}
+
+#[async_trait::async_trait]
+impl ipc::IpcTryReceive for api::FollowsEntry {
+    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<api::FollowsEntry>> {
+        let manga_id = stream.read_u64().await?;
+        let manga_title = String::ipc_receive(stream).await?;
+        let chapter_id = stream.read_u64().await?;
+        let chapter = String::ipc_receive(stream).await?;
+        let chapter_title = String::ipc_receive(stream).await?;
+        let chapter_volume = String::ipc_receive(stream).await?;
+        let marked_read = match stream.read_u8().await? {
+            0u8 => false,
+            1u8 => true,
+            _ => return Ok(None)
+        };
+        let last_update = String::ipc_receive(stream).await?;
+
+        Ok(Some(api::FollowsEntry {
+            manga_id, manga_title, chapter_id, chapter, chapter_title, chapter_volume, marked_read, last_update
+        }))
+    }
+}
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for api::MangaDexSession {
@@ -141,7 +191,8 @@ pub enum Response {
     FollowManga(Result<(), String>),
     UnfollowManga(Result<(), String>),
     MarkChapterRead(Result<(), String>),
-    MarkChapterUnread(Result<(), String>)
+    MarkChapterUnread(Result<(), String>),
+    Follows(Result<Vec<api::FollowsEntry>, String>)
 }
 
 #[async_trait::async_trait]
@@ -186,6 +237,10 @@ impl ipc::IpcSend for Response {
             Response::MarkChapterUnread(markchapterunread) => {
                 stream.write_u8(ipc::RESPONSE_MARK_CHAPTER_UNREAD).await?;
                 markchapterunread.ipc_send(stream).await
+            },
+            Response::Follows(follows) => {
+                stream.write_u8(ipc::RESPONSE_FOLLOWS).await?;
+                follows.ipc_send(stream).await
             }
         }
     }
@@ -205,6 +260,7 @@ impl ipc::IpcTryReceive for Response {
             ipc::RESPONSE_UNFOLLOW_MANGA => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::UnfollowManga),
             ipc::RESPONSE_MARK_CHAPTER_READ => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::MarkChapterRead),
             ipc::RESPONSE_MARK_CHAPTER_UNREAD => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::MarkChapterUnread),
+            ipc::RESPONSE_FOLLOWS => Result::<Vec<api::FollowsEntry>, String>::ipc_try_receive(stream).await?.map(Response::Follows),
             byte => {
                 warn!("received unknown response byte: {}", byte);
                 None
