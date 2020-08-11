@@ -33,7 +33,7 @@ urmom@gay ~> mangadex-fsc search --author "Dowman Sayman" --include anthology su
  4261 Nickelodeon │ Dowman Sayman │ Not followed    │ 2 mo ago
 20563 Melancholia │ Dowman Sayman │ Not followed    │ 2 mo ago
 OK
-urmom@gay ~> mangadex-fsc add manga 20563
+urmom@gay ~> mangadex-fsc manga add 20563
 Manga Melancholia has been added.
 OK
 ```

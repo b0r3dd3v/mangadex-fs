@@ -212,36 +212,86 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err(err) => Err(err)
                     }
                 },
-                ("add", Some(add_args)) => match add_args.subcommand() {
-                    ("manga", Some(manga_args)) => client.add_manga(
-                        manga_args.value_of("manga_id").unwrap().parse::<u64>().unwrap(),
-                        manga_args.values_of("language").unwrap().map(String::from).collect::<Vec<String>>()
+                ("manga", Some(manga_args)) => match manga_args.subcommand() {
+                    ("add", Some(add_args)) => client.add_manga(
+                        add_args.value_of("manga_id").unwrap().parse::<u64>().unwrap(),
+                        add_args.values_of("language").unwrap().map(String::from).collect::<Vec<String>>()
                     ).await.map(|text| {
                         println!("Manga {} has been added.", text.green());
                     }),
-                    (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"add {}\"", command)))
+                    ("follow", Some(follow_args)) => {
+                        let status = (|| {
+                            let mut status = mangadex_fs::api::MDListStatus::Reading;
+
+                            if let Some(status_param_str) = follow_args.value_of("status") {
+                                status = match status_param_str {
+                                    "reading" => mangadex_fs::api::MDListStatus::Reading,
+                                    "completed" => mangadex_fs::api::MDListStatus::Completed,
+                                    "onhold" => mangadex_fs::api::MDListStatus::OnHold,
+                                    "dropped" => mangadex_fs::api::MDListStatus::Dropped,
+                                    "plantoread" => mangadex_fs::api::MDListStatus::PlanToRead,
+                                    "rereading" => mangadex_fs::api::MDListStatus::ReReading,
+                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse status argument: \"{}\"", status_param_str)))
+                                };
+                            }
+
+                            Ok(status)
+                        })();
+
+                        match status {
+                            Ok(status) => client.follow_manga(follow_args.value_of("manga_id").unwrap().parse::<u64>().unwrap(), status).await,
+                            Err(err) => Err(err)
+                        }
+                    },
+                    ("unfollow", Some(unfollow_args)) => client.unfollow_manga(unfollow_args.value_of("manga_id").unwrap().parse::<u64>().unwrap()).await,
+                    (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"manga {}\"", command)))
                 },
-                ("show", Some(show_args)) => match show_args.subcommand() {
-                    ("mdlist", Some(mdlist_args)) => {
+                ("mdlist", Some(mdlist_args)) => match mdlist_args.subcommand() {
+                    ("add", Some(follow_args)) => {
+                        let status = (|| {
+                            let mut status = mangadex_fs::api::MDListStatus::Reading;
+
+                            if let Some(status_param_str) = follow_args.value_of("status") {
+                                status = match status_param_str {
+                                    "reading" => mangadex_fs::api::MDListStatus::Reading,
+                                    "completed" => mangadex_fs::api::MDListStatus::Completed,
+                                    "onhold" => mangadex_fs::api::MDListStatus::OnHold,
+                                    "dropped" => mangadex_fs::api::MDListStatus::Dropped,
+                                    "plantoread" => mangadex_fs::api::MDListStatus::PlanToRead,
+                                    "rereading" => mangadex_fs::api::MDListStatus::ReReading,
+                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse status argument: \"{}\"", status_param_str)))
+                                };
+                            }
+
+                            Ok(status)
+                        })();
+
+                        match status {
+                            Ok(status) => client.follow_manga(follow_args.value_of("manga_id").unwrap().parse::<u64>().unwrap(), status).await,
+                            Err(err) => Err(err)
+                        }
+                    },
+                    ("remove", Some(unfollow_args)) => client.unfollow_manga(unfollow_args.value_of("manga_id").unwrap().parse::<u64>().unwrap()).await,
+                    ("show", Some(show_args)) => {
                         let params = (|| {
                             let mut params = mangadex_fs::api::MDListParams::default();
 
-                            params.id = mdlist_args.value_of("mdlist_id").unwrap().parse::<u64>().unwrap();
+                            params.id = show_args.value_of("mdlist_id").unwrap().parse::<u64>().unwrap();
                             
-                            if let Some(sort_param_str) = mdlist_args.value_of("sort") {
+                            if let Some(sort_param_str) = show_args.value_of("sort") {
                                 params.sort_by = mangadex_fs::api::SortBy(
                                     mangadex_fs::api::SortMode::Ascending,
                                     mangadex_fs::api::SortParameter::try_from(sort_param_str).unwrap()
                                 );
                             }
-                            else if let Some(sort_param_str) = mdlist_args.value_of("sort_descending") {
+                            else if let Some(sort_param_str) = show_args.value_of("sort_descending") {
                                 params.sort_by = mangadex_fs::api::SortBy(
                                     mangadex_fs::api::SortMode::Descending,
                                     mangadex_fs::api::SortParameter::try_from(sort_param_str).unwrap()
                                 );
                             }
 
-                            if let Some(status_param_str) = mdlist_args.value_of("status") {
+                            if let Some(status_param_str) = show_args.value_of("status") {
                                 params.status = match status_param_str {
                                     "reading" => Some(mangadex_fs::api::MDListStatus::Reading),
                                     "completed" => Some(mangadex_fs::api::MDListStatus::Completed),
@@ -255,8 +305,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             Ok(params)
                         })();
-
-                        println!("params: {:?}", params);
 
                         match params {
                             Ok(params) => client.mdlist(params).await.map(|results| {

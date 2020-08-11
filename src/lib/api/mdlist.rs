@@ -117,11 +117,7 @@ pub async fn mdlist(client: &reqwest::Client, session: &Option<api::MangaDexSess
         .headers(headers(session))
         .send().await?
         .text().await?;
-
-        use tokio::io::AsyncWriteExt;
-    let mut dump = tokio::fs::File::create("dump").await.unwrap();
-    dump.write_all(text.as_bytes()).await.ok();
-
+        
     let html = scraper::Html::parse_document(text.as_str());
 
     Ok(html.select(&scraper::Selector::parse("div#content > div.manga-entry").unwrap())

@@ -29,7 +29,9 @@ impl Connection {
                         ipc::Command::LogOut => self.log_out().await?,
                         ipc::Command::AddManga(id, languages) => self.add_manga(id, languages).await?,
                         ipc::Command::Search(params) => self.search(&params).await?,
-                        ipc::Command::MDList(params) => self.mdlist(&params).await?
+                        ipc::Command::MDList(params) => self.mdlist(&params).await?,
+                        ipc::Command::FollowManga(id, status) => self.follow(id, &status).await?,
+                        ipc::Command::UnfollowManga(id) => self.unfollow(id).await?
                     };
 
                     response.ipc_send(&mut self.stream).await?;
@@ -143,9 +145,38 @@ impl Connection {
             Err(error) => {
                 warn!("mdlist error: {:?}", error);
                 
+                ipc::Response::Search(Err("request error".into()))
+            }
+        })
+    }
+
+    pub async fn follow(&mut self, id: u64, status: &api::MDListStatus) -> std::io::Result<ipc::Response> {
+        Ok(match self.context.follow(id, status).await {
+            Ok(_) => {
+                ipc::Response::FollowManga(Ok(()))
+            },
+            Err(error) => {
+                warn!("follow error: {:?}", error);
+                
                 match error {
-                    api::APIError::Request(_) => ipc::Response::Search(Err("request error".into())),
-                    api::APIError::NotLoggedIn => ipc::Response::Search(Err("you need to be logged in to use this command".into()))
+                    api::APIError::Request(_) => ipc::Response::FollowManga(Err("request error".into())),
+                    api::APIError::NotLoggedIn => ipc::Response::FollowManga(Err("you need to be logged in to use this command".into()))
+                }
+            }
+        })
+    }
+
+    pub async fn unfollow(&mut self, id: u64) -> std::io::Result<ipc::Response> {
+        Ok(match self.context.unfollow(id).await {
+            Ok(_) => {
+                ipc::Response::UnfollowManga(Ok(()))
+            },
+            Err(error) => {
+                warn!("unfollow error: {:?}", error);
+                
+                match error {
+                    api::APIError::Request(_) => ipc::Response::UnfollowManga(Err("request error".into())),
+                    api::APIError::NotLoggedIn => ipc::Response::UnfollowManga(Err("you need to be logged in to use this command".into()))
                 }
             }
         })

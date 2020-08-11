@@ -316,7 +316,15 @@ impl Context {
         self.api.read().await.search(params).await
     }
 
-    pub async fn mdlist(&self, params: &api::MDListParams) -> Result<Vec<api::MDListEntry>, api::APIError> {
+    pub async fn mdlist(&self, params: &api::MDListParams) -> Result<Vec<api::MDListEntry>, api::MDListError> {
         self.api.read().await.mdlist(params).await
+    }
+
+    pub async fn follow(&self, id: u64, status: &api::MDListStatus) -> Result<(), api::APIError> {
+        self.api.read().await.follow(id, status).await
+    }
+
+    pub async fn unfollow(&self, id: u64) -> Result<(), api::APIError> {
+        self.api.read().await.unfollow(id).await
     }
 }

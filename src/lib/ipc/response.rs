@@ -137,7 +137,9 @@ pub enum Response {
     LogOut(Result<(), String>),
     AddManga(Result<String, String>),
     Search(Result<Vec<api::SearchEntry>, String>),
-    MDList(Result<Vec<api::MDListEntry>, String>)
+    MDList(Result<Vec<api::MDListEntry>, String>),
+    FollowManga(Result<(), String>),
+    UnfollowManga(Result<(), String>)
 }
 
 #[async_trait::async_trait]
@@ -167,6 +169,14 @@ impl ipc::IpcSend for Response {
                 stream.write_u8(ipc::RESPONSE_MDLIST).await?;
                 mdlist.ipc_send(stream).await
             }
+            Response::FollowManga(followmanga) => {
+                stream.write_u8(ipc::RESPONSE_FOLLOW_MANGA).await?;
+                followmanga.ipc_send(stream).await
+            },
+            Response::UnfollowManga(unfollowmanga) => {
+                stream.write_u8(ipc::RESPONSE_UNFOLLOW_MANGA).await?;
+                unfollowmanga.ipc_send(stream).await
+            }
         }
     }
 }
@@ -181,6 +191,8 @@ impl ipc::IpcTryReceive for Response {
             ipc::RESPONSE_ADD_MANGA => Result::<String, String>::ipc_try_receive(stream).await?.map(Response::AddManga),
             ipc::RESPONSE_SEARCH => Result::<Vec<api::SearchEntry>, String>::ipc_try_receive(stream).await?.map(Response::Search),
             ipc::RESPONSE_MDLIST => Result::<Vec<api::MDListEntry>, String>::ipc_try_receive(stream).await?.map(Response::MDList),
+            ipc::RESPONSE_FOLLOW_MANGA => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::FollowManga),
+            ipc::RESPONSE_UNFOLLOW_MANGA => Result::<(), String>::ipc_try_receive(stream).await?.map(Response::UnfollowManga),
             byte => {
                 warn!("received unknown response byte: {}", byte);
                 None

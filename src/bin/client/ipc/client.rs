@@ -83,4 +83,24 @@ impl Client {
     pub async fn end_connection(mut self) -> ClientResult<()> {
         ipc::Command::EndConnection.ipc_send(&mut self.stream).await.map_err(ClientError::IO)
     }
+
+    pub async fn follow_manga(&mut self, id: u64, status: api::MDListStatus) -> ClientResult<()> {
+        ipc::Command::FollowManga(id, status).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+
+        match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
+            Some(ipc::Response::FollowManga(Ok(_))) => Ok(()),
+            Some(ipc::Response::FollowManga(Err(failure))) => Err(ClientError::Message(failure)),
+            _ => Err(ClientError::Message("unexpected daemon response".into()))
+        }
+    }
+
+    pub async fn unfollow_manga(&mut self, id: u64) -> ClientResult<()> {
+        ipc::Command::UnfollowManga(id).ipc_send(&mut self.stream).await.map_err(ClientError::IO)?;
+
+        match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
+            Some(ipc::Response::UnfollowManga(Ok(_))) => Ok(()),
+            Some(ipc::Response::UnfollowManga(Err(failure))) => Err(ClientError::Message(failure)),
+            _ => Err(ClientError::Message("unexpected daemon response".into()))
+        }
+    }
 }

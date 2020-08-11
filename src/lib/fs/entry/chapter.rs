@@ -1,5 +1,4 @@
 use crate::api;
-use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub struct Hosted {
@@ -53,12 +52,6 @@ pub struct Chapter {
     pub pages: ChapterPages
 }
 
-impl std::hash::Hash for Chapter {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
 impl Chapter {
     pub fn new(id: u64, chapter_api: api::Chapter) -> Chapter {
         Chapter {
@@ -82,19 +75,13 @@ impl Chapter {
     }
 
     pub fn display(&self) -> String {
-        let hash = {
-            let mut s = std::collections::hash_map::DefaultHasher::new();
-            self.hash(&mut s);
-            s.finish()
-        };
-
         match (self.title.is_empty(), self.volume.is_empty()) {
-            (true, true) => sanitize_filename::sanitize(format!("Ch. {} [{:06x}]", self.chapter, hash)),
-            (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {} [{:06x}]", self.volume, self.chapter, hash)),
-            (false, true) => sanitize_filename::sanitize(format!("Ch. {} - {} [{:06x}]", self.chapter, self.title, hash)),
+            (true, true) => sanitize_filename::sanitize(format!("Ch. {} [{}]", self.chapter, self.id)),
+            (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {} [{}]", self.volume, self.chapter, self.id)),
+            (false, true) => sanitize_filename::sanitize(format!("Ch. {} - {} [{}]", self.chapter, self.title, self.id)),
             _ => sanitize_filename::sanitize(format!(
-                "Vol. {} Ch. {} - {} [{:06x}]",
-                self.volume, self.chapter, self.title, hash
+                "Vol. {} Ch. {} - {} [{}]",
+                self.volume, self.chapter, self.title, self.id
             ))
         }
     }

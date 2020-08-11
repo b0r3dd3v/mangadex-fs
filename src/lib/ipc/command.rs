@@ -184,7 +184,9 @@ pub enum Command {
     LogOut,
     AddManga(u64, Vec<String>),
     Search(api::SearchParams),
-    MDList(api::MDListParams)
+    MDList(api::MDListParams),
+    FollowManga(u64, api::MDListStatus),
+    UnfollowManga(u64)
 }
 
 #[async_trait::async_trait]
@@ -213,6 +215,15 @@ impl ipc::IpcSend for Command {
             Command::MDList(params) => {
                 stream.write_u8(ipc::COMMAND_MDLIST).await?;
                 params.ipc_send(stream).await
+            },
+            Command::FollowManga(id, status) => {
+                stream.write_u8(ipc::COMMAND_FOLLOW_MANGA).await?;
+                stream.write_u64(*id).await?;
+                status.encode().ipc_send(stream).await
+            },
+            Command::UnfollowManga(id) => {
+                stream.write_u8(ipc::COMMAND_UNFOLLOW_MANGA).await?;
+                stream.write_u64(*id).await
             }
         }
     }
@@ -229,6 +240,13 @@ impl ipc::IpcTryReceive for Command {
             ipc::COMMAND_ADD_MANGA => Some(Command::AddManga(stream.read_u64().await?, Vec::<String>::ipc_receive(stream).await?)),
             ipc::COMMAND_SEARCH => api::SearchParams::ipc_try_receive(stream).await?.map(Command::Search),
             ipc::COMMAND_MDLIST => api::MDListParams::ipc_try_receive(stream).await?.map(Command::MDList),
+            ipc::COMMAND_FOLLOW_MANGA => {
+                let id = stream.read_u64().await?;
+                let status = stream.read_u8().await?;
+
+                api::MDListStatus::decode(status).and_then(|status| Some(Command::FollowManga(id, status)))
+            },
+            ipc::COMMAND_UNFOLLOW_MANGA => Some(Command::UnfollowManga(stream.read_u64().await?)),
             byte => {
                 warn!("received unknown command byte: {}", byte);
                 None

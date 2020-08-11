@@ -14,6 +14,7 @@ pub struct MangaDexAPI {
 pub type GetMangaError = reqwest::Error;
 pub type GetChapterError = reqwest::Error;
 pub type GetPageError = reqwest::Error;
+pub type MDListError = reqwest::Error;
 
 impl MangaDexAPI {
     pub fn new() -> MangaDexAPI {
@@ -73,7 +74,21 @@ impl MangaDexAPI {
         }
     }
 
-    pub async fn mdlist(&self, params: &api::MDListParams) -> Result<Vec<api::MDListEntry>, api::APIError> {
-        api::mdlist(&self.client, &self.session, params).await.map_err(APIError::Request)
+    pub async fn mdlist(&self, params: &api::MDListParams) -> Result<Vec<api::MDListEntry>, MDListError> {
+        api::mdlist(&self.client, &self.session, params).await
+    }
+
+    pub async fn follow(&self, id: u64, status: &api::MDListStatus) -> Result<(), api::APIError> {
+        match &self.session {
+            Some(session) => api::follow(&self.client, &session, id, status).await.map_err(APIError::Request),
+            None => Err(APIError::NotLoggedIn)
+        }
+    }
+
+    pub async fn unfollow(&self, id: u64) -> Result<(), api::APIError> {
+        match &self.session {
+            Some(session) => api::unfollow(&self.client, &session, id).await.map_err(APIError::Request),
+            None => Err(APIError::NotLoggedIn)
+        }
     }
 }
