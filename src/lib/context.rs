@@ -139,7 +139,7 @@ impl Context {
         }
     }
 
-    pub async fn get_or_fetch_chapter(&self, id: u64) -> Result<GetOrFetchRef<fs::entry::Chapter>, api::GetMangaError> {
+    pub async fn get_or_fetch_chapter(self: &std::sync::Arc<Context>, id: u64) -> Result<GetOrFetchRef<fs::entry::Chapter>, api::GetMangaError> {
         match self.chapters.write().await.entry(id) {
             std::collections::hash_map::Entry::Occupied(occupied) => Ok(GetOrFetchRef::Cached(std::sync::Arc::downgrade(occupied.get()))),
             std::collections::hash_map::Entry::Vacant(vacant) => match self.api.read().await.get_chapter(id).await {
@@ -164,15 +164,28 @@ impl Context {
                                                 let mut directory = fs::entry::Directory::new(1u64);
                                                 match &chapter.pages {
                                                     fs::entry::ChapterPages::Hosted(hosted) => {
-                                                        for page in &hosted.pages {
+                                                        let mut tasks = Vec::with_capacity(hosted.pages.len());
+
+                                                        for (index, page) in hosted.pages.iter().enumerate() {
                                                             let url = hosted.url.join(page).unwrap();
 
                                                             let page_ino: u64 = self.make_next_ino().await;
                                                             directory.children.insert(page.into(), (page_ino, true));
                                                             self.pages_inodes.write().await.insert(url.clone(), page_ino);
 
-                                                            debug!("fetching page from {}", url);
-                                                            self.get_or_fetch_page(chapter.id, &url).await.ok();
+                                                            debug!("fetching page {}/{} for chapter {}", index + 1, hosted.pages.len(), id);
+
+                                                            let self_ = self.clone();
+                                                            let chapter_id = chapter.id;
+                                                            
+                                                            tasks.push(tokio::spawn(async move {
+                                                                self_.get_or_fetch_page(chapter_id, &url).await.ok();
+                                                            }));
+                                                        }
+
+                                                        for (index, task) in tasks.into_iter().enumerate() {
+                                                            debug!("awaiting page {}/{} for chapter {}", index + 1, hosted.pages.len(), id);
+                                                            task.await.ok();
                                                         }
                                                     },
                                                     fs::entry::ChapterPages::External(external) => {
@@ -223,15 +236,28 @@ impl Context {
                                     let mut directory = fs::entry::Directory::new(1u64);
                                     match &chapter.pages {
                                         fs::entry::ChapterPages::Hosted(hosted) => {
-                                            for page in &hosted.pages {
+                                            let mut tasks = Vec::with_capacity(hosted.pages.len());
+
+                                            for (index, page) in hosted.pages.iter().enumerate() {
                                                 let url = hosted.url.join(page).unwrap();
 
                                                 let page_ino: u64 = self.make_next_ino().await;
                                                 directory.children.insert(page.into(), (page_ino, true));
                                                 self.pages_inodes.write().await.insert(url.clone(), page_ino);
 
-                                                debug!("fetching page from {}", url);
-                                                self.get_or_fetch_page(chapter.id, &url).await.ok();
+                                                debug!("fetching page {}/{} for chapter {}", index + 1, hosted.pages.len(), id);
+
+                                                let self_ = self.clone();
+                                                let chapter_id = chapter.id;
+                                                
+                                                tasks.push(tokio::spawn(async move {
+                                                    self_.get_or_fetch_page(chapter_id, &url).await.ok();
+                                                }));
+                                            }
+
+                                            for (index, task) in tasks.into_iter().enumerate() {
+                                                debug!("awaiting page {}/{} for chapter {}", index + 1, hosted.pages.len(), id);
+                                                task.await.ok();
                                             }
                                         },
                                         fs::entry::ChapterPages::External(external) => {
