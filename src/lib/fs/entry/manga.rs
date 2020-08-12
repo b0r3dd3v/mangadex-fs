@@ -23,14 +23,19 @@ impl ChapterShort {
 
 impl std::string::ToString for ChapterShort {
     fn to_string(&self) -> String {
-        match (self.title.is_empty(), self.volume.is_empty()) {
-            (true, true) => sanitize_filename::sanitize(format!("Ch. {} [{}]", self.chapter, self.id)),
-            (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {} [{}]", self.volume, self.chapter, self.id)),
-            (false, true) => sanitize_filename::sanitize(format!("Ch. {} - {} [{}]", self.chapter, self.title, self.id)),
-            _ => sanitize_filename::sanitize(format!(
-                "Vol. {} Ch. {} - {} [{}]",
-                self.volume, self.chapter, self.title, self.id
-            )),
+        if self.title == "Oneshot" {
+            format!("Oneshot [{}]", self.id)
+        }
+        else {
+            match (self.title.is_empty(), self.volume.is_empty()) {
+                (true, true) => sanitize_filename::sanitize(format!("Ch. {} [{}]", self.chapter, self.id)),
+                (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {} [{}]", self.volume, self.chapter, self.id)),
+                (false, true) => sanitize_filename::sanitize(format!("Ch. {} - {} [{}]", self.chapter, self.title, self.id)),
+                _ => sanitize_filename::sanitize(format!(
+                    "Vol. {} Ch. {} - {} [{}]",
+                    self.volume, self.chapter, self.title, self.id
+                )),
+            }
         }
     }
 }

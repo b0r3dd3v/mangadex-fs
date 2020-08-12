@@ -323,10 +323,6 @@ pub async fn search(client: &reqwest::Client, session: &api::MangaDexSession, pa
         .send().await?
         .text().await?;
 
-        use tokio::io::AsyncWriteExt;
-    let mut file = tokio::fs::File::create("dump").await.ok().unwrap();
-    file.write_all(text.as_bytes()).await.ok();
-
     let html = scraper::Html::parse_document(text.as_str());
 
     Ok(html.select(&scraper::Selector::parse("div#content > div.manga-entry").unwrap())
