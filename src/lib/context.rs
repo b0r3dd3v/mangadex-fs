@@ -5,11 +5,13 @@ pub struct Context {
     pub manga: tokio::sync::RwLock<std::collections::HashMap<u64, std::sync::Arc<fs::entry::Manga>>>,
     pub chapters: tokio::sync::RwLock<std::collections::HashMap<u64, std::sync::Arc<fs::entry::Chapter>>>,
     pub pages: tokio::sync::RwLock<std::collections::HashMap<reqwest::Url, std::sync::Arc<fs::entry::Page>>>,
+    pub covers: tokio::sync::RwLock<std::collections::HashMap<reqwest::Url, std::sync::Arc<fs::entry::Cover>>>,
 
     pub entries: tokio::sync::RwLock<std::collections::HashMap<u64, fs::entry::Inode>>,
     manga_inodes: tokio::sync::RwLock<std::collections::HashMap<u64, u64>>,
     chapters_inodes: tokio::sync::RwLock<std::collections::HashMap<u64, u64>>,
     pages_inodes: tokio::sync::RwLock<std::collections::HashMap<reqwest::Url, u64>>,
+    cover_inodes: tokio::sync::RwLock<std::collections::HashMap<reqwest::Url, u64>>,
 
     server: tokio::sync::Mutex<polyfuse_tokio::Server>,
     api: tokio::sync::RwLock<api::MangaDexAPI>,
@@ -46,23 +48,27 @@ impl Context {
             manga: tokio::sync::RwLock::new(std::collections::HashMap::default()),
             chapters: tokio::sync::RwLock::new(std::collections::HashMap::default()),
             pages: tokio::sync::RwLock::new(std::collections::HashMap::default()),
+            covers: tokio::sync::RwLock::new(std::collections::HashMap::default()),
             entries: tokio::sync::RwLock::new(entries),
             next_ino: tokio::sync::Mutex::new(2u64),
             uid, gid,
             manga_inodes: tokio::sync::RwLock::default(),
             chapters_inodes: tokio::sync::RwLock::default(),
-            pages_inodes: tokio::sync::RwLock::default()
+            pages_inodes: tokio::sync::RwLock::default(),
+            cover_inodes: tokio::sync::RwLock::default()
         })
     }
 
     async fn make_next_ino(&self) -> u64 {
         let mut next_ino = self.next_ino.lock().await;
+        debug!("generated ino: {}", *next_ino);
         let ret = *next_ino;
         *next_ino += 1u64;
         ret
     }
 
     async fn new_node(&self, ino: u64, entry: fs::entry::Entry) {
+        debug!("writing entry \"{}\" at ino: {}", entry.variant(), ino);
         self.entries.write().await.insert(ino, fs::entry::Inode(entry, fs::entry::Attributes::new(ino, self.uid.clone(), self.gid.clone())));
     }
 
@@ -96,10 +102,29 @@ impl Context {
                         }
                     }
 
-                    let manga_ref = std::sync::Arc::downgrade(&manga);
-                    self.new_node(manga_ino, fs::entry::Entry::Manga(manga_ref, directory)).await;
                     self.manga_inodes.write().await.insert(manga.id, manga_ino);
 
+                    if let Some(url) = &manga.cover {
+                        let cover_ino: u64 = self.make_next_ino().await;
+                        directory.children.insert(url
+                            .path_segments()
+                            .and_then(|split| split.last())
+                            .and_then(|last| std::path::Path::new(last).extension())
+                            .map(|extension| {
+                                let mut cover = std::path::PathBuf::from("cover");
+                                cover.set_extension(extension);
+                                cover
+                            })
+                            .unwrap(), (cover_ino, true));
+                        self.cover_inodes.write().await.insert(url.clone(), cover_ino);
+
+                        debug!("fetching cover from {}", url);
+                        self.get_or_fetch_cover(id, &url).await.ok();
+                    }
+
+                    let manga_ref = std::sync::Arc::downgrade(&manga);
+                    self.new_node(manga_ino, fs::entry::Entry::Manga(manga_ref, directory)).await;
+                    
                     if let Some(fs::entry::Inode(fs::entry::Entry::Root(directory), _)) = self.entries.write().await.get_mut(&1u64) {
                         directory.children.insert(manga.to_string().into(), (manga_ino, false));
 
@@ -140,16 +165,14 @@ impl Context {
                                                 match &chapter.pages {
                                                     fs::entry::ChapterPages::Hosted(hosted) => {
                                                         for page in &hosted.pages {
-                                                            let page_ino: u64 = self.make_next_ino().await;
-                                                            directory.children.insert(page.into(), (page_ino, true));
-
                                                             let url = hosted.url.join(page).unwrap();
 
-                                                            debug!("fetching page from {}", url);
-                                                            let page = self.get_or_fetch_page(chapter.id, &url).await?.get();
+                                                            let page_ino: u64 = self.make_next_ino().await;
+                                                            directory.children.insert(page.into(), (page_ino, true));
+                                                            self.pages_inodes.write().await.insert(url.clone(), page_ino);
 
-                                                            self.new_node(page_ino, fs::entry::Entry::Page(page)).await;
-                                                            self.pages_inodes.write().await.insert(url, page_ino);
+                                                            debug!("fetching page from {}", url);
+                                                            self.get_or_fetch_page(chapter.id, &url).await.ok();
                                                         }
                                                     },
                                                     fs::entry::ChapterPages::External(external) => {
@@ -201,16 +224,14 @@ impl Context {
                                     match &chapter.pages {
                                         fs::entry::ChapterPages::Hosted(hosted) => {
                                             for page in &hosted.pages {
-                                                let page_ino: u64 = self.make_next_ino().await;
-                                                directory.children.insert(page.into(), (page_ino, true));
-
                                                 let url = hosted.url.join(page).unwrap();
 
-                                                debug!("fetching page from {}", url);
-                                                let page = self.get_or_fetch_page(chapter.id, &url).await?.get();
+                                                let page_ino: u64 = self.make_next_ino().await;
+                                                directory.children.insert(page.into(), (page_ino, true));
+                                                self.pages_inodes.write().await.insert(url.clone(), page_ino);
 
-                                                self.new_node(page_ino, fs::entry::Entry::Page(page)).await;
-                                                self.pages_inodes.write().await.insert(url, page_ino);
+                                                debug!("fetching page from {}", url);
+                                                self.get_or_fetch_page(chapter.id, &url).await.ok();
                                             }
                                         },
                                         fs::entry::ChapterPages::External(external) => {
@@ -274,22 +295,14 @@ impl Context {
                             match pages_inodes_read_lock.get(&url).cloned() {
                                 Some(page_ino) => {
                                     drop(pages_inodes_read_lock);
+                                    debug!("reusing page inode: {}", page_ino);
+
+                                    let page_ref = std::sync::Arc::downgrade(&page);
                                     
-                                    let entries_read_lock =  self.entries.read().await;
-                                    match entries_read_lock.get(&page_ino) {
-                                        Some(_) => {
-                                            drop(entries_read_lock);
-                                            debug!("reusing page inode: {}", page_ino);
+                                    self.new_node(page_ino, fs::entry::Entry::Page(page_ref)).await;
+                                    self.server.lock().await.notify_inval_inode(chapter_ino, 0i64, 0i64).await.ok();
 
-                                            let page_ref = std::sync::Arc::downgrade(&page);
-                                            
-                                            self.new_node(page_ino, fs::entry::Entry::Page(page_ref)).await;
-                                            self.server.lock().await.notify_inval_inode(chapter_ino, 0i64, 0i64).await.ok();
-
-                                            Ok(GetOrFetchRef::Fetched(std::sync::Arc::downgrade(vacant.insert(page))))
-                                        },
-                                        None => panic!("cached page inode is invalid?")
-                                    }
+                                    Ok(GetOrFetchRef::Fetched(std::sync::Arc::downgrade(vacant.insert(page))))
                                 },
                                 None => {
                                     let page_ino = self.make_next_ino().await;
@@ -305,6 +318,50 @@ impl Context {
                             }
                         },
                         None => panic!("chapter inode not saved in inodes map?")
+                    }
+                },
+                Err(error) => Err(error)
+            }
+        }
+    }
+
+    pub async fn get_or_fetch_cover(&self, manga_id: u64, url: &reqwest::Url) -> Result<GetOrFetchRef<fs::entry::Cover>, api::GetCoverError> {
+        match self.covers.write().await.entry(url.clone()) {
+            std::collections::hash_map::Entry::Occupied(occupied) => Ok(GetOrFetchRef::Cached(std::sync::Arc::downgrade(occupied.get()))),
+            std::collections::hash_map::Entry::Vacant(vacant) => match self.api.read().await.get_cover(&url).await {
+                Ok(cover_api) => {
+                    let cover = std::sync::Arc::new(fs::entry::Cover(cover_api.0));
+
+                    match self.manga_inodes.read().await.get(&manga_id).cloned() {
+                        Some(manga_ino) => {
+                            let cover_inodes_read_lock = self.cover_inodes.read().await;
+
+                            match cover_inodes_read_lock.get(&url).cloned() {
+                                Some(cover_ino) => {
+                                    drop(cover_inodes_read_lock);
+                                    debug!("reusing cover inode: {}", cover_ino);
+
+                                    let cover_ref = std::sync::Arc::downgrade(&cover);
+                                    
+                                    self.new_node(cover_ino, fs::entry::Entry::Cover(cover_ref)).await;
+                                    self.server.lock().await.notify_inval_inode(manga_ino, 0i64, 0i64).await.ok();
+
+                                    Ok(GetOrFetchRef::Fetched(std::sync::Arc::downgrade(vacant.insert(cover))))
+                                },
+                                None => {
+                                    let cover_ino = self.make_next_ino().await;
+                                    debug!("creating cover inode: {}", cover_ino);
+
+                                    let cover_ref = std::sync::Arc::downgrade(&cover);
+                                    
+                                    self.new_node(cover_ino, fs::entry::Entry::Cover(cover_ref)).await;
+                                    self.server.lock().await.notify_inval_inode(manga_ino, 0i64, 0i64).await.ok();
+    
+                                    Ok(GetOrFetchRef::Fetched(std::sync::Arc::downgrade(vacant.insert(cover))))
+                                }
+                            }
+                        },
+                        None => panic!("manga inode not saved in inodes map?")
                     }
                 },
                 Err(error) => Err(error)

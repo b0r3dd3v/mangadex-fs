@@ -12,6 +12,7 @@ pub mod follow;
 pub mod unfollow;
 pub mod mark_chapter;
 pub mod follows;
+pub mod cover;
 
 pub use session::*;
 pub use manga::*;
@@ -27,3 +28,4 @@ pub use follow::*;
 pub use unfollow::*;
 pub use mark_chapter::*;
 pub use follows::*;
+pub use cover::*;

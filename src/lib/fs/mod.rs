@@ -48,6 +48,7 @@ impl MangaDexFS {
             Some(entry::Inode(entry::Entry::Chapter(_, directory), _)) => make_result(directory),
             Some(entry::Inode(entry::Entry::ChapterNotFetched(_), _)) => Err(std::io::Error::from_raw_os_error(libc::EINVAL)),
             Some(entry::Inode(entry::Entry::Page(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
+            Some(entry::Inode(entry::Entry::Cover(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
             Some(entry::Inode(entry::Entry::External(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
             None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
         }
@@ -70,6 +71,10 @@ impl MangaDexFS {
         match read_lock.get(&op.ino()) {
             Some(entry::Inode(entry::Entry::Page(page_ref), _)) => match page_ref.upgrade() {
                 Some(page) => Ok(page.0[op.offset() as usize..std::cmp::min(op.offset() as usize + op.size() as usize, page.0.len())].into()),
+                None => Err(std::io::Error::from_raw_os_error(libc::EIO))
+            },
+            Some(entry::Inode(entry::Entry::Cover(cover_ref), _)) => match cover_ref.upgrade() {
+                Some(cover) => Ok(cover.0[op.offset() as usize..std::cmp::min(op.offset() as usize + op.size() as usize, cover.0.len())].into()),
                 None => Err(std::io::Error::from_raw_os_error(libc::EIO))
             },
             Some(entry::Inode(entry::Entry::External(bytes), _)) => Ok(bytes[op.offset() as usize..std::cmp::min(op.offset() as usize + op.size() as usize, bytes.len())].into()),
@@ -135,6 +140,7 @@ impl MangaDexFS {
                 }
             },
             Some(entry::Inode(entry::Entry::Page(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
+            Some(entry::Inode(entry::Entry::Cover(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
             Some(entry::Inode(entry::Entry::External(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),
             None => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
         }

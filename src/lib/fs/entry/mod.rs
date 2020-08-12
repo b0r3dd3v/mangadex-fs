@@ -1,10 +1,12 @@
 pub mod chapter;
 pub mod manga;
 pub mod page;
+pub mod cover;
 
 pub use chapter::*;
 pub use manga::*;
 pub use page::*;
+pub use cover::*;
 
 #[derive(Debug)]
 pub struct Attributes {
@@ -89,8 +91,23 @@ pub enum Entry {
     Chapter(std::sync::Weak<Chapter>, Directory),
     ChapterNotFetched(u64),
     Page(std::sync::Weak<Page>),
+    Cover(std::sync::Weak<Cover>),
     External(Vec<u8>),
     Root(Directory)
+}
+
+impl Entry {
+    pub fn variant(&self) -> &'static str {
+        match self {
+            Entry::Manga(_, _) => "manga",
+            Entry::Chapter(_, _) => "chapter",
+            Entry::ChapterNotFetched(_) => "chapter (not fetched)",
+            Entry::Page(_) => "page",
+            Entry::Cover(_) => "cover",
+            Entry::External(_) => "external",
+            Entry::Root(_) => "root"
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -135,6 +152,16 @@ impl Inode {
                 Some(attr)
             },
             Entry::Page(page_ref) => page_ref.upgrade().map(|page| {
+                let mut attr = attributes.file_attr();
+
+                attr.set_size(page.0.len() as u64);
+                attr.set_blocks(1u64 + (page.0.len() as u64 / 512u64));
+                attr.set_mode(libc::S_IFREG as u32 | 0o444);
+                attr.set_nlink(1u32);
+
+                attr
+            }),
+            Entry::Cover(page_ref) => page_ref.upgrade().map(|page| {
                 let mut attr = attributes.file_attr();
 
                 attr.set_size(page.0.len() as u64);

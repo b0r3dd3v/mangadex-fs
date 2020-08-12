@@ -14,6 +14,7 @@ pub struct MangaDexAPI {
 pub type GetMangaError = reqwest::Error;
 pub type GetChapterError = reqwest::Error;
 pub type GetPageError = reqwest::Error;
+pub type GetCoverError = reqwest::Error;
 pub type MDListError = reqwest::Error;
 
 impl MangaDexAPI {
@@ -65,6 +66,10 @@ impl MangaDexAPI {
 
     pub async fn get_page(&self, chapter_id: u64, url: &reqwest::Url) -> Result<api::Page, GetPageError> {
         api::Page::get(&self.client, chapter_id, url).await
+    }
+
+    pub async fn get_cover(&self, url: &reqwest::Url) -> Result<api::Cover, GetPageError> {
+        api::Cover::get(&self.client, url).await
     }
 
     pub async fn search(&self, params: &api::SearchParams) -> Result<Vec<api::SearchEntry>, api::APIError> {
