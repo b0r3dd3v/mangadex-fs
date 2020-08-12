@@ -6,22 +6,23 @@ pub enum TagMode {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 pub enum Language {
-    Japanese,
-    English,
-    Polish,
-    Russian,
-    German,
-    French,
-    Vietnamese,
-    Swedish,
-    Chinese,
-    Indonesian,
-    Korean,
-    Spanish,
-    Thai,
-    Filipino,
-    ChineseTrad
+    Japanese = 2u8,
+    English = 1u8,
+    Polish = 3u8,
+    Russian = 7u8,
+    German = 8u8,
+    French = 10u8,
+    Vietnamese = 12u8,
+    Swedish = 18u8,
+    Chinese = 21u8,
+    Indonesian = 27u8,
+    Korean = 28u8,
+    Spanish = 29u8,
+    Thai = 32u8,
+    Filipino = 34u8,
+    ChineseTrad = 35u8
 }
 
 #[derive(Debug)]
@@ -87,56 +88,38 @@ impl std::convert::TryFrom<&str> for Language {
     }
 }
 
-impl Language {
-    pub fn code(&self) -> u8 {
-        match self {
-            Language::Japanese => 2u8,
-            Language::English => 1u8,
-            Language::Polish => 3u8,
-            Language::Russian => 7u8,
-            Language::German => 8u8,
-            Language::French => 10u8,
-            Language::Vietnamese => 12u8,
-            Language::Swedish => 18u8,
-            Language::Chinese => 21u8,
-            Language::Indonesian => 27u8,
-            Language::Korean => 28u8,
-            Language::Spanish => 29u8,
-            Language::Thai => 32u8,
-            Language::Filipino => 34u8,
-            Language::ChineseTrad => 35u8
-        }
-    }
+impl std::convert::TryFrom<u8> for Language {
+    type Error = ();
 
-    pub fn from_code(n: u8) -> Option<Self> {
+    fn try_from(n: u8) -> Result<Language, Self::Error> {
         match n {
-            2u8 => Some(Language::Japanese),
-            1u8 => Some(Language::English),
-            3u8 => Some(Language::Polish),
-            7u8 => Some(Language::Russian),
-            8u8 => Some(Language::German),
-            10u8 => Some(Language::French),
-            12u8 => Some(Language::Vietnamese),
-            18u8 => Some(Language::Swedish),
-            21u8 => Some(Language::Chinese),
-            27u8 => Some(Language::Indonesian),
-            28u8 => Some(Language::Korean),
-            29u8 => Some(Language::Spanish),
-            32u8 => Some(Language::Thai),
-            34u8 => Some(Language::Filipino),
-            35u8 => Some(Language::ChineseTrad),
-            _ => None
+            2u8 => Ok(Language::Japanese),
+            1u8 => Ok(Language::English),
+            3u8 => Ok(Language::Polish),
+            7u8 => Ok(Language::Russian),
+            8u8 => Ok(Language::German),
+            10u8 => Ok(Language::French),
+            12u8 => Ok(Language::Vietnamese),
+            18u8 => Ok(Language::Swedish),
+            21u8 => Ok(Language::Chinese),
+            27u8 => Ok(Language::Indonesian),
+            28u8 => Ok(Language::Korean),
+            29u8 => Ok(Language::Spanish),
+            32u8 => Ok(Language::Thai),
+            34u8 => Ok(Language::Filipino),
+            35u8 => Ok(Language::ChineseTrad),
+            _ => Err(())
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum SortMode {
     Ascending,
     Descending
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum SortParameter {
     Title,
     LastUpdated,
@@ -146,26 +129,50 @@ pub enum SortParameter {
     Follows
 }
 
-impl SortParameter {
-    pub fn try_from(string: &str) -> Option<SortParameter> {
+impl std::convert::TryFrom<&str> for SortParameter {
+    type Error = ();
+
+    fn try_from(string: &str) -> Result<SortParameter, Self::Error> {
         match string {
-            "title" => Some(SortParameter::Title),
-            "lastupdated" => Some(SortParameter::LastUpdated),
-            "comments" => Some(SortParameter::Comments),
-            "rating" => Some(SortParameter::Rating),
-            "views" => Some(SortParameter::Views),
-            "follows" => Some(SortParameter::Follows),
-            _ => None
+            "title" => Ok(SortParameter::Title),
+            "lastupdated" => Ok(SortParameter::LastUpdated),
+            "comments" => Ok(SortParameter::Comments),
+            "rating" => Ok(SortParameter::Rating),
+            "views" => Ok(SortParameter::Views),
+            "follows" => Ok(SortParameter::Follows),
+            _ => Err(())
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SortBy(pub SortMode, pub SortParameter);
 
-impl SortBy {
-    pub fn encode(&self) -> u8 {
-        match (&self.0, &self.1) {
+impl std::convert::TryFrom<u8> for SortBy {
+    type Error = ();
+
+    fn try_from(byte: u8) -> Result<SortBy, Self::Error> {
+        match byte {
+            2u8 => Ok(SortBy(SortMode::Ascending, SortParameter::Title)),
+            3u8 => Ok(SortBy(SortMode::Descending, SortParameter::Title)),
+            0u8 => Ok(SortBy(SortMode::Ascending, SortParameter::LastUpdated)),
+            1u8 => Ok(SortBy(SortMode::Descending, SortParameter::LastUpdated)),
+            4u8 => Ok(SortBy(SortMode::Ascending, SortParameter::Comments)),
+            5u8 => Ok(SortBy(SortMode::Descending, SortParameter::Comments)),
+            6u8 => Ok(SortBy(SortMode::Ascending, SortParameter::Rating)),
+            7u8 => Ok(SortBy(SortMode::Descending, SortParameter::Rating)),
+            8u8 => Ok(SortBy(SortMode::Ascending, SortParameter::Views)),
+            9u8 => Ok(SortBy(SortMode::Descending, SortParameter::Views)),
+            10u8 => Ok(SortBy(SortMode::Ascending, SortParameter::Follows)),
+            11u8 => Ok(SortBy(SortMode::Descending, SortParameter::Follows)),
+            _ => Err(())
+        }
+    }
+}
+
+impl From<SortBy> for u8 {
+    fn from(sortby: SortBy) -> u8 {
+        match (sortby.0, sortby.1) {
             (SortMode::Ascending, SortParameter::Title) => 2u8,
             (SortMode::Descending, SortParameter::Title) => 3u8,
             (SortMode::Ascending, SortParameter::LastUpdated) => 0u8,
@@ -178,24 +185,6 @@ impl SortBy {
             (SortMode::Descending, SortParameter::Views) => 9u8,
             (SortMode::Ascending, SortParameter::Follows) => 10u8,
             (SortMode::Descending, SortParameter::Follows) => 11u8
-        }
-    }
-
-    pub fn decode(byte: u8) -> Option<SortBy> {
-        match byte {
-            2u8 => Some(SortBy(SortMode::Ascending, SortParameter::Title)),
-            3u8 => Some(SortBy(SortMode::Descending, SortParameter::Title)),
-            0u8 => Some(SortBy(SortMode::Ascending, SortParameter::LastUpdated)),
-            1u8 => Some(SortBy(SortMode::Descending, SortParameter::LastUpdated)),
-            4u8 => Some(SortBy(SortMode::Ascending, SortParameter::Comments)),
-            5u8 => Some(SortBy(SortMode::Descending, SortParameter::Comments)),
-            6u8 => Some(SortBy(SortMode::Ascending, SortParameter::Rating)),
-            7u8 => Some(SortBy(SortMode::Descending, SortParameter::Rating)),
-            8u8 => Some(SortBy(SortMode::Ascending, SortParameter::Views)),
-            9u8 => Some(SortBy(SortMode::Descending, SortParameter::Views)),
-            10u8 => Some(SortBy(SortMode::Ascending, SortParameter::Follows)),
-            11u8 => Some(SortBy(SortMode::Descending, SortParameter::Follows)),
-            _ => None
         }
     }
 }
@@ -266,12 +255,12 @@ fn headers(session: &api::MangaDexSession) -> reqwest::header::HeaderMap {
 pub async fn search(client: &reqwest::Client, session: &api::MangaDexSession, params: &SearchParams) -> Result<Vec<SearchEntry>, reqwest::Error> {
     let mut url = reqwest::Url::parse("https://mangadex.org/search/").unwrap();
 
-    url.query_pairs_mut().append_pair("s", params.sort_by.encode().to_string().as_str());
+    url.query_pairs_mut().append_pair("s", u8::from(params.sort_by).to_string().as_str());
     url.query_pairs_mut().append_pair("title", &params.title);
 
     if let Some(ref author) = params.author { url.query_pairs_mut().append_pair("author", author); }
     if let Some(ref artist) = params.artist { url.query_pairs_mut().append_pair("artist", artist); }
-    if let Some(ref language) = params.original_language { url.query_pairs_mut().append_pair("lang_id", &language.code().to_string()); }
+    if let Some(ref language) = params.original_language { url.query_pairs_mut().append_pair("lang_id", (*language as u8).to_string().as_str()); }
 
     match params.demographic {
         Demographic { shounen, shoujo, seinen, josei } => {

@@ -9,7 +9,8 @@ pub struct Client {
 #[derive(Debug)]
 pub enum ClientError {
     IO(std::io::Error),
-    Message(String)
+    Daemon(String),
+    Client(String)
 }
 
 pub type ClientResult<R> = Result<R, ClientError>;
@@ -26,7 +27,7 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::Kill) => Ok(()),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -35,8 +36,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::LogIn(Ok(session))) => Ok(session),
-            Some(ipc::Response::LogIn(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::LogIn(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -45,8 +46,8 @@ impl Client {
  
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::LogOut(Ok(_))) => Ok(()),
-            Some(ipc::Response::LogOut(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::LogOut(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -55,8 +56,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::AddManga(Ok(formatted))) => Ok(formatted),
-            Some(ipc::Response::AddManga(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::AddManga(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -65,8 +66,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::Search(Ok(entries))) => Ok(entries),
-            Some(ipc::Response::Search(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::Search(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -75,8 +76,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::MDList(Ok(entries))) => Ok(entries),
-            Some(ipc::Response::MDList(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::MDList(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -89,8 +90,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::FollowManga(Ok(_))) => Ok(()),
-            Some(ipc::Response::FollowManga(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::FollowManga(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -99,8 +100,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::UnfollowManga(Ok(_))) => Ok(()),
-            Some(ipc::Response::UnfollowManga(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::UnfollowManga(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -109,8 +110,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::MarkChapterRead(Ok(_))) => Ok(()),
-            Some(ipc::Response::MarkChapterRead(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::MarkChapterRead(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -119,8 +120,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::MarkChapterUnread(Ok(_))) => Ok(()),
-            Some(ipc::Response::MarkChapterUnread(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::MarkChapterUnread(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 
@@ -129,8 +130,8 @@ impl Client {
 
         match ipc::Response::ipc_try_receive(&mut self.stream).await.map_err(ClientError::IO)? {
             Some(ipc::Response::Follows(Ok(follows))) => Ok(follows),
-            Some(ipc::Response::Follows(Err(failure))) => Err(ClientError::Message(failure)),
-            _ => Err(ClientError::Message("unexpected daemon response".into()))
+            Some(ipc::Response::Follows(Err(failure))) => Err(ClientError::Daemon(failure)),
+            _ => Err(ClientError::Daemon("unexpected daemon response".into()))
         }
     }
 }

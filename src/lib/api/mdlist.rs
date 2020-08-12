@@ -1,17 +1,18 @@
 use crate::api;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 pub enum MDListStatus {
-    Reading,
-    Completed,
-    OnHold,
-    PlanToRead,
-    Dropped,
-    ReReading
+    Reading = 1u8,
+    Completed = 2u8,
+    OnHold = 3u8,
+    PlanToRead = 4u8,
+    Dropped = 5u8,
+    ReReading = 6u8
 }
 
 impl MDListStatus {
-    pub fn display(&self) -> &str {
+    pub fn to_str(&self) -> &'static str {
         match self {
             MDListStatus::Reading => "Reading",
             MDListStatus::Completed => "Completed",
@@ -21,27 +22,36 @@ impl MDListStatus {
             MDListStatus::ReReading => "Re-reading"
         }
     }
+}
 
-    pub fn encode(&self) -> u8 {
-        match self {
-            MDListStatus::Reading => 1u8,
-            MDListStatus::Completed => 2u8,
-            MDListStatus::OnHold => 3u8,
-            MDListStatus::PlanToRead => 4u8,
-            MDListStatus::Dropped => 5u8,
-            MDListStatus::ReReading => 6u8
+impl std::convert::TryFrom<u8> for MDListStatus {
+    type Error = ();
+
+    fn try_from(byte: u8) -> Result<MDListStatus, Self::Error> {
+        match byte {
+            1u8 => Ok(MDListStatus::Reading),
+            2u8 => Ok(MDListStatus::Completed),
+            3u8 => Ok(MDListStatus::OnHold),
+            4u8 => Ok(MDListStatus::PlanToRead),
+            5u8 => Ok(MDListStatus::Dropped),
+            6u8 => Ok(MDListStatus::ReReading),
+            _ => Err(())
         }
     }
+}
 
-    pub fn decode(byte: u8) -> Option<MDListStatus> {
-        match byte {
-            1u8 => Some(MDListStatus::Reading),
-            2u8 => Some(MDListStatus::Completed),
-            3u8 => Some(MDListStatus::OnHold),
-            4u8 => Some(MDListStatus::PlanToRead),
-            5u8 => Some(MDListStatus::Dropped),
-            6u8 => Some(MDListStatus::ReReading),
-            _ => None
+impl std::convert::TryFrom<&str> for MDListStatus {
+    type Error = ();
+
+    fn try_from(string: &str) -> Result<MDListStatus, Self::Error> {
+        match string {
+            "reading" => Ok(MDListStatus::Reading),
+            "completed" => Ok(MDListStatus::Completed),
+            "onhold" => Ok(MDListStatus::OnHold),
+            "plantoread" => Ok(MDListStatus::PlanToRead),
+            "dropped" => Ok(MDListStatus::Dropped),
+            "rereading" => Ok(MDListStatus::ReReading),
+            _ => Err(())
         }
     }
 }
@@ -104,13 +114,13 @@ pub async fn mdlist(client: &reqwest::Client, session: &Option<api::MangaDexSess
             &params.id.to_string(),
             &params.status
                 .as_ref()
-                .map(|status| status.encode())
+                .map(|status| *status as u8)
                 .unwrap_or(0u8)
                 .to_string()
         ))
         .unwrap();
         
-    url.query_pairs_mut().append_pair("s", params.sort_by.encode().to_string().as_str());
+    url.query_pairs_mut().append_pair("s", u8::from(params.sort_by).to_string().as_str());
 
     let text = client
         .get(url)

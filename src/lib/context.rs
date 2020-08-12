@@ -90,7 +90,7 @@ impl Context {
                     for chapter in &manga.chapters {
                         if languages.iter().find(|&lang| lang == &chapter.lang_code).is_some() {
                             let chapter_ino: u64 = self.make_next_ino().await;
-                            directory.children.insert(chapter.display().into(), (chapter_ino, false));
+                            directory.children.insert(chapter.to_string().into(), (chapter_ino, false));
                             self.new_node(chapter_ino, fs::entry::Entry::ChapterNotFetched(chapter.id)).await;
                             self.chapters_inodes.write().await.insert(chapter.id, chapter_ino);
                         }
@@ -101,7 +101,7 @@ impl Context {
                     self.manga_inodes.write().await.insert(manga.id, manga_ino);
 
                     if let Some(fs::entry::Inode(fs::entry::Entry::Root(directory), _)) = self.entries.write().await.get_mut(&1u64) {
-                        directory.children.insert(manga.display().into(), (manga_ino, false));
+                        directory.children.insert(manga.to_string().into(), (manga_ino, false));
 
                         self.server.lock().await.notify_inval_inode(1u64, 0i64, 0i64).await.ok();
 
@@ -242,7 +242,7 @@ impl Context {
                                     self.chapters_inodes.write().await.insert(chapter.id, chapter_ino);
 
                                     if let Some(fs::entry::Inode(fs::entry::Entry::Manga(_, directory), _)) = self.entries.write().await.get_mut(&manga_ino) {
-                                        directory.children.insert(chapter.display().into(), (manga_ino, true));
+                                        directory.children.insert(chapter.to_string().into(), (manga_ino, true));
 
                                         self.server.lock().await.notify_inval_inode(manga_ino, 0i64, 0i64).await.ok();
 

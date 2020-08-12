@@ -90,7 +90,7 @@ impl Connection {
         Ok(match self.context.get_or_fetch_manga(manga_id, languages).await {
             Ok(mangadex_fs::GetOrFetch::Cached(manga_ref)) => match manga_ref.upgrade() {
                 Some(manga) => {
-                    info!("cached manga {}: {:?}", manga_id, manga.display());
+                    info!("cached manga {}: {:?}", manga_id, manga);
 
                     ipc::Response::AddManga(Ok(manga.title.clone()))
                 },
@@ -102,7 +102,7 @@ impl Connection {
             },
             Ok(mangadex_fs::GetOrFetch::Fetched(manga_ref)) => match manga_ref.upgrade() {
                 Some(manga) => {
-                    info!("fetched manga {}: {:?}", manga_id, manga.display());
+                    info!("fetched manga {}: {:?}", manga_id, manga);
 
                     ipc::Response::AddManga(Ok(manga.title.clone()))
                 },

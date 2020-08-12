@@ -13,52 +13,52 @@ use crate::ipc;
 
 #[async_trait::async_trait]
 pub trait IpcSend: std::marker::Sync + std::marker::Send {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()>;
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()>;
 }
 
 #[async_trait::async_trait]
 pub trait IpcReceive: Sized {
-    async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Self>;
+    async fn ipc_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Self>;
 }
 
 #[async_trait::async_trait]
 pub trait IpcTryReceive: Sized {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>>;
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>>;
 }
 
 #[async_trait::async_trait]
 impl IpcSend for () {
-    async fn ipc_send(&self, _stream: &mut tokio::net::UnixStream) -> std::io::Result<()> { Ok(()) }
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, _stream: &mut W) -> std::io::Result<()> { Ok(()) }
 }
 
 #[async_trait::async_trait]
 impl IpcReceive for () {
-    async fn ipc_receive(_stream: &mut tokio::net::UnixStream) -> std::io::Result<Self> { Ok(()) }
+    async fn ipc_receive<R: tokio::io::AsyncRead + Unpin + Send>(_stream: &mut R) -> std::io::Result<Self> { Ok(()) }
 }
 
 #[async_trait::async_trait]
 impl IpcTryReceive for () {
-    async fn ipc_try_receive(_stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> { Ok(Some(())) }
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(_stream: &mut R) -> std::io::Result<Option<Self>> { Ok(Some(())) }
 }
 
 #[async_trait::async_trait]
 impl IpcSend for u8 {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> { stream.write_u8(*self).await }
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> { stream.write_u8(*self).await }
 }
 
 #[async_trait::async_trait]
 impl IpcReceive for u8 {
-    async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Self> { stream.read_u8().await }
+    async fn ipc_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Self> { stream.read_u8().await }
 }
 
 #[async_trait::async_trait]
 impl IpcTryReceive for u8 {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> { stream.read_u8().await.map(Some) }
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> { stream.read_u8().await.map(Some) }
 }
 
 #[async_trait::async_trait]
 impl IpcSend for String {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         let bytes: &[u8] = self.as_ref();
 
         stream.write_u64(bytes.len() as u64).await?;
@@ -70,7 +70,7 @@ impl IpcSend for String {
 
 #[async_trait::async_trait]
 impl IpcReceive for String {
-    async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Self> {
+    async fn ipc_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Self> {
         let length: u64 = stream.read_u64().await?;
 
         if length > 0 {
@@ -88,14 +88,14 @@ impl IpcReceive for String {
 
 #[async_trait::async_trait]
 impl IpcTryReceive for String {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         String::ipc_receive(stream).await.map(Some)
     }
 }
 
 #[async_trait::async_trait]
 impl<T: IpcSend> IpcSend for Vec<T> {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         stream.write_u64(self.len() as u64).await?;
 
         for item in self.iter() {
@@ -108,7 +108,7 @@ impl<T: IpcSend> IpcSend for Vec<T> {
 
 #[async_trait::async_trait]
 impl<T: IpcReceive + Send> IpcReceive for Vec<T> {
-    async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Self> {
+    async fn ipc_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Self> {
         let length: u64 = stream.read_u64().await?;
         let mut buffer = Vec::with_capacity(length as usize);
                             
@@ -122,7 +122,7 @@ impl<T: IpcReceive + Send> IpcReceive for Vec<T> {
 
 #[async_trait::async_trait]
 impl<T: IpcTryReceive + Send> IpcTryReceive for Vec<T> {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         let length: u64 = stream.read_u64().await?;
         let mut buffer = Vec::with_capacity(length as usize);
                             
@@ -139,7 +139,7 @@ impl<T: IpcTryReceive + Send> IpcTryReceive for Vec<T> {
 
 #[async_trait::async_trait]
 impl<T: ipc::IpcSend, E: ipc::IpcSend> ipc::IpcSend for Result<T, E> {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         match self {
             Ok(success) => {
                 stream.write_u8(ipc::RESULT_OK).await?;
@@ -155,7 +155,7 @@ impl<T: ipc::IpcSend, E: ipc::IpcSend> ipc::IpcSend for Result<T, E> {
 
 #[async_trait::async_trait]
 impl<T: ipc::IpcTryReceive, E: ipc::IpcTryReceive> ipc::IpcTryReceive for Result<T, E> {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         Ok(match stream.read_u8().await? {
             ipc::RESULT_OK => T::ipc_try_receive(stream).await?.map(|value| Ok(value)),
             ipc::RESULT_ERR => E::ipc_try_receive(stream).await?.map(|error| Err(error)),
@@ -169,7 +169,7 @@ impl<T: ipc::IpcTryReceive, E: ipc::IpcTryReceive> ipc::IpcTryReceive for Result
 
 #[async_trait::async_trait]
 impl<T: ipc::IpcSend> ipc::IpcSend for Option<T> {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         match self {
             Some(some) => {
                 stream.write_u8(ipc::OPTION_SOME).await?;
@@ -182,7 +182,7 @@ impl<T: ipc::IpcSend> ipc::IpcSend for Option<T> {
 
 #[async_trait::async_trait]
 impl<T: ipc::IpcTryReceive> ipc::IpcTryReceive for Option<T> {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         Ok(match stream.read_u8().await? {
             ipc::OPTION_SOME => T::ipc_try_receive(stream).await?.map(|value| Some(value)),
             ipc::OPTION_NONE => Some(None),

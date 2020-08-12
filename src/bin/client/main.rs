@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         params.original_language = match search_args.value_of("language") { 
                             Some(lang_str) => match mangadex_fs::api::Language::try_from(lang_str) {
                                 Ok(language) => Some(language),
-                                Err(_) => return Err(ipc::ClientError::Message(format!("Failed to parse language argument: \"{}\"", lang_str)))
+                                Err(_) => return Err(ipc::ClientError::Client(format!("failed to parse language argument: \"{}\"", lang_str)))
                             },
                             None => None
                         };
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             "shoujo" => demographic.shoujo = true,
                                             "seinen" => demographic.seinen = true,
                                             "josei" => demographic.josei = true,
-                                            _ => return Err(ipc::ClientError::Message(format!("Failed to parse demographic argument: \"{}\"", value)))
+                                            _ => return Err(ipc::ClientError::Client(format!("failed to parse demographic argument: \"{}\"", value)))
                                         }
                                     }
 
@@ -92,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             "completed" => publication.completed = true,
                                             "cancelled" => publication.cancelled = true,
                                             "hiatus" => publication.hiatus = true,
-                                            _ => return Err(ipc::ClientError::Message(format!("Failed to parse publication status argument: \"{}\"", value)))
+                                            _ => return Err(ipc::ClientError::Client(format!("failed to parse publication status argument: \"{}\"", value)))
                                         }
                                     }
 
@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     for value in values {
                                         match mangadex_fs::api::Genre::try_from(value) {
                                             Ok(tag) => include_tag.push(tag),
-                                            _ => return Err(ipc::ClientError::Message(format!("Failed to parse include tag argument: \"{}\"", value)))
+                                            _ => return Err(ipc::ClientError::Client(format!("failed to parse include tag argument: \"{}\"", value)))
                                         }
                                     }
 
@@ -126,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     for value in values {
                                         match mangadex_fs::api::Genre::try_from(value) {
                                             Ok(tag) => exclude_tag.push(tag),
-                                            _ => return Err(ipc::ClientError::Message(format!("Failed to parse include tag argument: \"{}\"", value)))
+                                            _ => return Err(ipc::ClientError::Client(format!("failed to parse include tag argument: \"{}\"", value)))
                                         }
                                     }
 
@@ -140,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 match value {
                                     "all" => mangadex_fs::api::TagMode::All,
                                     "any" => mangadex_fs::api::TagMode::Any,
-                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse tag inclusion mode argument: \"{}\"", value)))
+                                    _ => return Err(ipc::ClientError::Client(format!("failed to parse tag inclusion mode argument: \"{}\"", value)))
                                 }
                             },
                             None => mangadex_fs::api::TagMode::All
@@ -150,7 +150,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 match value {
                                     "all" => mangadex_fs::api::TagMode::All,
                                     "any" => mangadex_fs::api::TagMode::Any,
-                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse tag inclusion mode argument: \"{}\"", value)))
+                                    _ => return Err(ipc::ClientError::Client(format!("failed to parse tag inclusion mode argument: \"{}\"", value)))
                                 }
                             },
                             None => mangadex_fs::api::TagMode::Any
@@ -182,12 +182,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 for result in &results {
                                     let status = match &result.status {
                                         Some(status) => match status {
-                                            mangadex_fs::api::MDListStatus::Completed => status.display().bright_blue(),
-                                            mangadex_fs::api::MDListStatus::OnHold => status.display().bright_yellow(),
-                                            mangadex_fs::api::MDListStatus::PlanToRead => status.display().white(),
-                                            mangadex_fs::api::MDListStatus::Dropped => status.display().bright_red(),
-                                            mangadex_fs::api::MDListStatus::Reading => status.display().bright_green(),
-                                            mangadex_fs::api::MDListStatus::ReReading => status.display().green()
+                                            mangadex_fs::api::MDListStatus::Completed => status.to_str().bright_blue(),
+                                            mangadex_fs::api::MDListStatus::OnHold => status.to_str().bright_yellow(),
+                                            mangadex_fs::api::MDListStatus::PlanToRead => status.to_str().white(),
+                                            mangadex_fs::api::MDListStatus::Dropped => status.to_str().bright_red(),
+                                            mangadex_fs::api::MDListStatus::Reading => status.to_str().bright_green(),
+                                            mangadex_fs::api::MDListStatus::ReReading => status.to_str().green()
                                         },
                                         None => "Not followed".bright_black()
                                     };
@@ -221,7 +221,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             client.mark_chapter_unread(mark_args.value_of("chapter_id").unwrap().parse::<u64>().unwrap()).await
                         }
                     },
-                    (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"chapter {}\"", command)))
+                    (command, _) => Err(ipc::ClientError::Client(format!("unknown subcommand \"chapter {}\"", command)))
                 },
                 ("manga", Some(manga_args)) => match manga_args.subcommand() {
                     ("add", Some(add_args)) => client.add_manga(
@@ -242,7 +242,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "dropped" => mangadex_fs::api::MDListStatus::Dropped,
                                     "plantoread" => mangadex_fs::api::MDListStatus::PlanToRead,
                                     "rereading" => mangadex_fs::api::MDListStatus::ReReading,
-                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse status argument: \"{}\"", status_param_str)))
+                                    _ => return Err(ipc::ClientError::Client(format!("failed to parse status argument: \"{}\"", status_param_str)))
                                 };
                             }
 
@@ -255,7 +255,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     },
                     ("unfollow", Some(unfollow_args)) => client.unfollow_manga(unfollow_args.value_of("manga_id").unwrap().parse::<u64>().unwrap()).await,
-                    (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"manga {}\"", command)))
+                    (command, _) => Err(ipc::ClientError::Client(format!("unknown subcommand \"manga {}\"", command)))
                 },
                 ("mdlist", Some(mdlist_args)) => match mdlist_args.subcommand() {
                     ("add", Some(follow_args)) => {
@@ -270,7 +270,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "dropped" => mangadex_fs::api::MDListStatus::Dropped,
                                     "plantoread" => mangadex_fs::api::MDListStatus::PlanToRead,
                                     "rereading" => mangadex_fs::api::MDListStatus::ReReading,
-                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse status argument: \"{}\"", status_param_str)))
+                                    _ => return Err(ipc::ClientError::Client(format!("Failed to parse status argument: \"{}\"", status_param_str)))
                                 };
                             }
 
@@ -310,7 +310,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "dropped" => Some(mangadex_fs::api::MDListStatus::Dropped),
                                     "plantoread" => Some(mangadex_fs::api::MDListStatus::PlanToRead),
                                     "rereading" => Some(mangadex_fs::api::MDListStatus::ReReading),
-                                    _ => return Err(ipc::ClientError::Message(format!("Failed to parse status argument: \"{}\"", status_param_str)))
+                                    _ => return Err(ipc::ClientError::Client(format!("Failed to parse status argument: \"{}\"", status_param_str)))
                                 };
                             }
 
@@ -327,12 +327,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                     for result in &results {
                                         let status = match &result.status {
-                                            mangadex_fs::api::MDListStatus::Completed => result.status.display().bright_blue(),
-                                            mangadex_fs::api::MDListStatus::OnHold => result.status.display().bright_yellow(),
-                                            mangadex_fs::api::MDListStatus::PlanToRead => result.status.display().white(),
-                                            mangadex_fs::api::MDListStatus::Dropped => result.status.display().bright_red(),
-                                            mangadex_fs::api::MDListStatus::Reading => result.status.display().bright_green(),
-                                            mangadex_fs::api::MDListStatus::ReReading => result.status.display().green()
+                                            mangadex_fs::api::MDListStatus::Completed => result.status.to_str().bright_blue(),
+                                            mangadex_fs::api::MDListStatus::OnHold => result.status.to_str().bright_yellow(),
+                                            mangadex_fs::api::MDListStatus::PlanToRead => result.status.to_str().white(),
+                                            mangadex_fs::api::MDListStatus::Dropped => result.status.to_str().bright_red(),
+                                            mangadex_fs::api::MDListStatus::Reading => result.status.to_str().bright_green(),
+                                            mangadex_fs::api::MDListStatus::ReReading => result.status.to_str().green()
                                         };
 
                                         println!(
@@ -357,9 +357,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Err(err) => Err(err)
                         }
                     },
-                    (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"add {}\"", command)))
+                    (command, _) => Err(ipc::ClientError::Client(format!("unknown subcommand \"add {}\"", command)))
                 },
-                ("follows", Some(follow_args)) => {
+                ("follows", Some(_)) => {
                     client.follows().await.map(|results| {
                         if results.len() > 0 {
                             let format_chapter = |entry: &mangadex_fs::api::FollowsEntry| {
@@ -398,7 +398,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     })
                 },
-                (command, _) => Err(ipc::ClientError::Message(format!("unknown subcommand \"{}\"", command)))
+                (command, _) => Err(ipc::ClientError::Client(format!("unknown subcommand \"{}\"", command)))
             };
 
             client.end_connection().await.ok();
@@ -409,7 +409,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match result {
         Ok(_) => println!("{}", "OK".bright_green()),
-        Err(ipc::ClientError::Message(msg)) => println!("{}: {}", "Error".bright_red(), msg),
+        Err(ipc::ClientError::Client(msg)) => println!("{}: {}", "Error".bright_red(), msg),
+        Err(ipc::ClientError::Daemon(msg)) => println!("{}: {}", "Daemon error".bright_red(), msg),
         Err(ipc::ClientError::IO(error)) => println!("{}: {}", "IO error".bright_red(), error)
     };
 

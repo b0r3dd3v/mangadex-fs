@@ -73,8 +73,10 @@ impl Chapter {
             }
         }
     }
+}
 
-    pub fn display(&self) -> String {
+impl std::string::ToString for Chapter {
+    fn to_string(&self) -> String {
         match (self.title.is_empty(), self.volume.is_empty()) {
             (true, true) => sanitize_filename::sanitize(format!("Ch. {} [{}]", self.chapter, self.id)),
             (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {} [{}]", self.volume, self.chapter, self.id)),

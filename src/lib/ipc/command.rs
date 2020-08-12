@@ -8,29 +8,29 @@ use std::convert::TryFrom;
 
 #[async_trait::async_trait]
 impl ipc::IpcSend for api::MDListParams {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         stream.write_u64(self.id).await?;
-        self.sort_by.encode().ipc_send(stream).await?;
-        self.status.as_ref().map(|status| status.encode()).ipc_send(stream).await
+        u8::from(self.sort_by).ipc_send(stream).await?;
+        self.status.as_ref().map(|status| (*status as u8)).ipc_send(stream).await
     }
 }
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for api::MDListParams {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         let mut params = api::MDListParams::default();
 
         params.id = stream.read_u64().await?;
-        params.sort_by =  match api::SortBy::decode(u8::ipc_receive(stream).await?) {
-            Some(sort_by) => sort_by,
-            None => return Ok(None)
+        params.sort_by =  match api::SortBy::try_from(u8::ipc_receive(stream).await?) {
+            Ok(sort_by) => sort_by,
+            Err(_) => return Ok(None)
         };
 
         params.status =  match Option::<u8>::ipc_try_receive(stream).await? {
             Some(option) => match option {
-                Some(byte) => match api::MDListStatus::decode(byte) {
-                    Some(status) => Some(status),
-                    None => return Ok(None)
+                Some(byte) => match api::MDListStatus::try_from(byte) {
+                    Ok(status) => Some(status),
+                    Err(_) => return Ok(None)
                 },
                 None => None
             },
@@ -43,11 +43,11 @@ impl ipc::IpcTryReceive for api::MDListParams {
 
 #[async_trait::async_trait]
 impl ipc::IpcSend for api::SearchParams {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         self.title.ipc_send(stream).await?;
         self.author.ipc_send(stream).await?;
         self.artist.ipc_send(stream).await?;
-        self.original_language.map(|lang| lang.code()).ipc_send(stream).await?;
+        self.original_language.map(|language| language as u8).ipc_send(stream).await?;
         
         let mut demo_pub_bits: u8 = 0b00000000;
 
@@ -74,13 +74,13 @@ impl ipc::IpcSend for api::SearchParams {
 
         tag_mode.ipc_send(stream).await?;
 
-        self.sort_by.encode().ipc_send(stream).await
+        u8::from(self.sort_by).ipc_send(stream).await
     }
 }
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for api::SearchParams {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         debug!("params");
         let mut params = api::SearchParams::default();
 
@@ -98,9 +98,9 @@ impl ipc::IpcTryReceive for api::SearchParams {
         debug!("artist: {:?}", params.artist);
         params.original_language = match Option::<u8>::ipc_try_receive(stream).await? {
             Some(maybe_byte) => match maybe_byte {
-                Some(byte) => match api::Language::from_code(byte) {
-                    Some(language) => Some(language),
-                    None => return Ok(None)
+                Some(byte) => match api::Language::try_from(byte) {
+                    Ok(language) => Some(language),
+                    Err(_) => return Ok(None)
                 },
                 None => None
             },
@@ -167,9 +167,9 @@ impl ipc::IpcTryReceive for api::SearchParams {
         params.exclusion_mode = exclusion_mode;
         debug!("mode: {:?} {:?}", params.inclusion_mode, params.exclusion_mode);
 
-        params.sort_by = match api::SortBy::decode(u8::ipc_receive(stream).await?) {
-            Some(sort_by) => sort_by,
-            None => return Ok(None)
+        params.sort_by = match api::SortBy::try_from(u8::ipc_receive(stream).await?) {
+            Ok(sort_by) => sort_by,
+            Err(_) => return Ok(None)
         };
 
         Ok(Some(params))
@@ -194,7 +194,7 @@ pub enum Command {
 
 #[async_trait::async_trait]
 impl ipc::IpcSend for Command {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         debug!("sending command: {:?}", self);
 
         match self {
@@ -222,7 +222,7 @@ impl ipc::IpcSend for Command {
             Command::FollowManga(id, status) => {
                 stream.write_u8(ipc::COMMAND_FOLLOW_MANGA).await?;
                 stream.write_u64(*id).await?;
-                status.encode().ipc_send(stream).await
+                (*status as u8).ipc_send(stream).await
             },
             Command::UnfollowManga(id) => {
                 stream.write_u8(ipc::COMMAND_UNFOLLOW_MANGA).await?;
@@ -243,7 +243,7 @@ impl ipc::IpcSend for Command {
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for Command {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         Ok(match stream.read_u8().await? {
             ipc::COMMAND_END_CONNECTION => Some(Command::EndConnection),
             ipc::COMMAND_KILL => Some(Command::Kill),
@@ -256,7 +256,7 @@ impl ipc::IpcTryReceive for Command {
                 let id = stream.read_u64().await?;
                 let status = stream.read_u8().await?;
 
-                api::MDListStatus::decode(status).and_then(|status| Some(Command::FollowManga(id, status)))
+                api::MDListStatus::try_from(status).ok().and_then(|status| Some(Command::FollowManga(id, status)))
             },
             ipc::COMMAND_UNFOLLOW_MANGA => Some(Command::UnfollowManga(stream.read_u64().await?)),
             ipc::COMMAND_MARK_CHAPTER_READ => Some(Command::MarkChapterRead(stream.read_u64().await?)),

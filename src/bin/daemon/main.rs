@@ -35,6 +35,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let socket_directory = config.socket.parent().unwrap();
+    let mountpoint = match cli.value_of("mountpoint").map(Into::into).or(config.mountpoint) {
+        Some(mountpoint) => mountpoint,
+        None => {
+            error!("mount point not present either passed arguments or config file");
+            return Ok(())
+        }
+    };
 
     if !socket_directory.exists() {
         tokio::fs::create_dir_all(socket_directory).await?;
@@ -42,14 +49,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match tokio::net::UnixListener::bind(&config.socket) {
         Ok(mut listener) => {
-            info!("hello");
+            info!("unix socket bound at {}", config.socket.to_string_lossy());
 
             let (kill_cmd_tx, mut kill_cmd_rx) = tokio::sync::mpsc::channel::<()>(1usize);
 
             let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
             let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-
-            let mountpoint = cli.value_of("path").unwrap().to_owned();
 
             let uid = nix::unistd::Uid::current();
             let gid = nix::unistd::Gid::current();
@@ -64,6 +69,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let polyfuse = tokio::spawn(async move {
                 polyfuse_server.run_until(mangadex_fs::MangaDexFS::new(polyfuse_context), polyfuse_sig).await
             });
+
+            let mut connection_counter = 0u64;
 
             loop {
                 let kill_cmd_tx = kill_cmd_tx.clone();
@@ -83,14 +90,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                     maybe_stream = listener.next() => match maybe_stream {
                         Some(Ok(stream)) => {
-                            info!("client connected");
-
                             let mut connection = ipc::Connection::new(stream, context.clone(), kill_cmd_tx);
 
                             tokio::spawn(async move {
+                                debug!("connection no. {} started", connection_counter);
+                                connection_counter += 1;
+
                                 match connection.read_eval_loop().await {
-                                    Ok(_) => info!("client disconnected"),
-                                    Err(error) => warn!("client disconnected with error: {}", error)
+                                    Ok(_) => debug!("connection no. {} ended successfully", connection_counter),
+                                    Err(error) => warn!("connection no. {} ended witn an error: {}", connection_counter, error)
                                 }
                             });
                         },

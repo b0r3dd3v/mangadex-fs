@@ -5,7 +5,7 @@ use tokio::io::{AsyncWriteExt, AsyncReadExt};
 
 #[async_trait::async_trait]
 impl ipc::IpcSend for api::MangaDexSession {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         self.id.ipc_send(stream).await?;
         self.remember_me_token.ipc_send(stream).await
     }
@@ -13,7 +13,7 @@ impl ipc::IpcSend for api::MangaDexSession {
 
 #[async_trait::async_trait]
 impl ipc::IpcReceive for api::MangaDexSession {
-    async fn ipc_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<api::MangaDexSession> {
+    async fn ipc_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<api::MangaDexSession> {
         Ok(api::MangaDexSession {
             id: String::ipc_receive(stream).await?,
             remember_me_token: String::ipc_receive(stream).await?
@@ -32,7 +32,7 @@ impl ipc::IpcReceive for api::MangaDexSession {
     */
 #[async_trait::async_trait]
 impl ipc::IpcSend for api::FollowsEntry {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         stream.write_u64(self.manga_id).await?;
         self.manga_title.ipc_send(stream).await?;
         stream.write_u64(self.chapter_id).await?;
@@ -51,7 +51,7 @@ impl ipc::IpcSend for api::FollowsEntry {
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for api::FollowsEntry {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<api::FollowsEntry>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<api::FollowsEntry>> {
         let manga_id = stream.read_u64().await?;
         let manga_title = String::ipc_receive(stream).await?;
         let chapter_id = stream.read_u64().await?;
@@ -73,7 +73,7 @@ impl ipc::IpcTryReceive for api::FollowsEntry {
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for api::MangaDexSession {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<api::MangaDexSession>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<api::MangaDexSession>> {
         Ok(Some(api::MangaDexSession {
             id: String::ipc_receive(stream).await?,
             remember_me_token: String::ipc_receive(stream).await?
@@ -83,7 +83,7 @@ impl ipc::IpcTryReceive for api::MangaDexSession {
 
 #[async_trait::async_trait]
 impl ipc::IpcSend for api::SearchEntry {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         stream.write_u64(self.id).await?;
         self.title.ipc_send(stream).await?;
         self.author.ipc_send(stream).await?;
@@ -106,7 +106,7 @@ impl ipc::IpcSend for api::SearchEntry {
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for api::SearchEntry {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<api::SearchEntry>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<api::SearchEntry>> {
         let id = stream.read_u64().await?;
         let title = String::ipc_receive(stream).await?;
         let author = String::ipc_receive(stream).await?;
@@ -136,7 +136,7 @@ impl ipc::IpcTryReceive for api::SearchEntry {
 
 #[async_trait::async_trait]
 impl ipc::IpcSend for api::MDListEntry {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         stream.write_u64(self.id).await?;
         self.title.ipc_send(stream).await?;
         self.author.ipc_send(stream).await?;
@@ -159,7 +159,7 @@ impl ipc::IpcSend for api::MDListEntry {
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for api::MDListEntry {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<api::MDListEntry>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<api::MDListEntry>> {
         let id = stream.read_u64().await?;
         let title = String::ipc_receive(stream).await?;
         let author = String::ipc_receive(stream).await?;
@@ -197,7 +197,7 @@ pub enum Response {
 
 #[async_trait::async_trait]
 impl ipc::IpcSend for Response {
-    async fn ipc_send(&self, stream: &mut tokio::net::UnixStream) -> std::io::Result<()> {
+    async fn ipc_send<W: tokio::io::AsyncWrite + Unpin + Send>(&self, stream: &mut W) -> std::io::Result<()> {
         debug!("sending response: {:?}", self);
 
         match self {
@@ -248,7 +248,7 @@ impl ipc::IpcSend for Response {
 
 #[async_trait::async_trait]
 impl ipc::IpcTryReceive for Response {
-    async fn ipc_try_receive(stream: &mut tokio::net::UnixStream) -> std::io::Result<Option<Self>> {
+    async fn ipc_try_receive<R: tokio::io::AsyncRead + Unpin + Send>(stream: &mut R) -> std::io::Result<Option<Self>> {
         Ok(match stream.read_u8().await? {
             ipc::RESPONSE_KILL => Some(Response::Kill),
             ipc::RESPONSE_LOG_IN => Result::<api::MangaDexSession, String>::ipc_try_receive(stream).await?.map(Response::LogIn),

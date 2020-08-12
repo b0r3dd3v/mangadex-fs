@@ -138,7 +138,7 @@ impl Inode {
                 let mut attr = attributes.file_attr();
 
                 attr.set_size(page.0.len() as u64);
-                attr.set_blocks(4u64);
+                attr.set_blocks(1u64 + (page.0.len() as u64 / 512u64));
                 attr.set_mode(libc::S_IFREG as u32 | 0o444);
                 attr.set_nlink(1u32);
 
@@ -148,7 +148,7 @@ impl Inode {
                 let mut attr = attributes.file_attr();
 
                 attr.set_size(bytes.len() as u64);
-                attr.set_blocks(4u64);
+                attr.set_blocks(1u64 + (bytes.len() as u64 / 512u64));
                 attr.set_mode(libc::S_IFREG as u32 | 0o444);
                 attr.set_nlink(1u32);
 

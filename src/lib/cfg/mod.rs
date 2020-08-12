@@ -1,7 +1,7 @@
 use tokio::io::AsyncReadExt;
 
-pub const SOCKET_NAME: &'static str = "mangadex-fsd.sock";
-pub const CONFIG_NAME: &'static str = "config.toml";
+pub const DEFAULT_SOCKET_NAME: &'static str = "mangadex-fsd.sock";
+pub const DEFAULT_CONFIG_NAME: &'static str = "config.toml";
 
 pub fn project_dirs() -> directories::ProjectDirs {
     directories::ProjectDirs::from("", "", "mangadex-fs").unwrap()
@@ -10,23 +10,28 @@ pub fn project_dirs() -> directories::ProjectDirs {
 pub fn config_file_path() -> std::path::PathBuf {
     let project_dirs = project_dirs();
     let config_dir = project_dirs.config_dir();
-    config_dir.join(std::path::Path::new(CONFIG_NAME))
+    config_dir.join(std::path::Path::new(DEFAULT_CONFIG_NAME))
 }
 
 pub fn default_socket_path() -> std::path::PathBuf {
     let project_dirs = project_dirs();
     let runtime_dir = project_dirs.runtime_dir().unwrap();
-    runtime_dir.join(std::path::Path::new(SOCKET_NAME))
+    runtime_dir.join(std::path::Path::new(DEFAULT_SOCKET_NAME))
 }
 
 #[derive(serde::Deserialize)]
 pub struct Config {
-    pub socket: std::path::PathBuf
+    #[serde(default = "default_socket_path")]
+    pub socket: std::path::PathBuf,
+    pub mountpoint: Option<std::path::PathBuf>
 }
 
 impl std::default::Default for Config {
     fn default() -> Config {
-        Config { socket: default_socket_path() }
+        Config {
+            socket: default_socket_path(),
+            mountpoint: None
+        }
     }
 }
 

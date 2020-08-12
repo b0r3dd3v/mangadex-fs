@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Clone, serde_repr::Deserialize_repr)]
+#[derive(Debug, PartialEq, Clone, Copy, serde_repr::Deserialize_repr)]
 #[repr(u8)]
 pub enum Genre {
     FourKoma = 1,

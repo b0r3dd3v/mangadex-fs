@@ -19,8 +19,10 @@ impl ChapterShort {
             lang_code: chapter_field.lang_code
         }
     }
+}
 
-    pub fn display(&self) -> String {
+impl std::string::ToString for ChapterShort {
+    fn to_string(&self) -> String {
         match (self.title.is_empty(), self.volume.is_empty()) {
             (true, true) => sanitize_filename::sanitize(format!("Ch. {} [{}]", self.chapter, self.id)),
             (true, false) => sanitize_filename::sanitize(format!("Vol. {} Ch. {} [{}]", self.volume, self.chapter, self.id)),
@@ -53,8 +55,10 @@ impl Manga {
                 .collect()
         }
     }
+}
 
-    pub fn display(&self) -> String {
+impl std::string::ToString for Manga {
+    fn to_string(&self) -> String {
         sanitize_filename::sanitize(format!("{} [{}]", self.title, self.id))
     }
 }

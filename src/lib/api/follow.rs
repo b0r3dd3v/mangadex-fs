@@ -27,7 +27,7 @@ pub async fn follow(client: &reqwest::Client, session: &api::MangaDexSession, id
         
     url.query_pairs_mut().append_pair("function", "manga_follow");
     url.query_pairs_mut().append_pair("id", id.to_string().as_str());
-    url.query_pairs_mut().append_pair("type", status.encode().to_string().as_str());
+    url.query_pairs_mut().append_pair("type", (*status as u8).to_string().as_str());
 
     client
         .get(url)
