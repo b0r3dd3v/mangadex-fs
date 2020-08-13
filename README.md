@@ -40,20 +40,14 @@ OK
 
 ### Notes
 
--   You need to have FUSE installed, and its kernel module loaded: `modprobe fuse`.
+-   **You need to have FUSE installed, and its kernel module loaded**: `modprobe fuse`.
+-   Tested on [Artix Linux](https://artixlinux.org/), but should work on any Linux.
 -   This version doesn't support any sort of API throttling/debouncing. For now.
 -   Since fetching only the chapter page image size no longer works (`curl -I image_url` returns `405`), every time your system issues a `readdir` call (basically `ls`) on a chapter directory, every image gets fetched in its entirety. You can imagine it can take some time. Also MangaDex servers get buried in requests.
 
     So if you're calling `tree` on the mountpoint directory, you are basically asking for an IP ban.
     
-    The `readdir` can also happen if you're using some fancy command line shells (`fish` for example), even if you are not in the chapter directory.
--   API responses are cached, and there is no command for fetching updates currently.
--   ```sh
-    cd <mountpoint>/<manga>/<chapter>
-    feh --image-bg "black" -Z -. -d -S filename --version-sort
-    ```
-
-    creates a good reader. Obviously you need to have [`feh`](https://github.com/derf/feh) installed.
+    The `readdir` can also happen if you're using some fancy command line shells (`fish` for example), even if you are not in the chapter directory, so be wary of this.
 -   You can enable logging by setting `RUST_LOG` environment variable. More [here](https://docs.rs/env_logger/0.7.0/env_logger/).
 -   If you encounter a `socket error: Address already in use (os error 98)`, it means the socket file is still present in the runtime directory, you can remove it with `rm $XDG_RUNTIME_DIR/mangadex-fs/mangadex-fsd.sock`.
 -   You can place a configuration file in `$XDG_CONFIG_HOME/mangadex-fs/config.toml`. It can be only provided with the socket file path and mountpoint for now, so it's mostly useless:
@@ -61,7 +55,13 @@ OK
 mountpoint = "/home/urmom/Manga/"
 socket = "/run/user/1000/mangadex-fs/mangadex-fsd.sock"
 ```
+-   API responses of resources (manga, chapters, pages) are cached, and there is no command for fetching updates currently. Searches, follows, mdlist are **NOT** cached.
+-   ```sh
+    cd <mountpoint>/<manga>/<chapter>
+    feh --image-bg "black" -Z -. -d -S filename --version-sort
+    ```
 
+    creates a good reader. Obviously you need to have [`feh`](https://github.com/derf/feh).
 -   >Your code is a dumpster fire
 
     I bet! This is my first time using Rust for something more complicated than _Hello world_. If you have any guidelines or want to contribute go ahead, any help would be appreciated. With all these mutexes flying around I have no idea what I'm doing.
