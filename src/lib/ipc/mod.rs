@@ -187,7 +187,7 @@ impl<T: ipc::IpcTryReceive> ipc::IpcTryReceive for Option<T> {
             ipc::OPTION_SOME => T::ipc_try_receive(stream).await?.map(|value| Some(value)),
             ipc::OPTION_NONE => Some(None),
             byte => {
-                warn!("read invalid result byte: {}", byte);
+                warn!("read invalid option byte: {}", byte);
                 None
             }
         })

@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mountpoint = match cli.value_of("mountpoint").map(Into::into).or(config.mountpoint) {
         Some(mountpoint) => mountpoint,
         None => {
-            error!("mount point not present either passed arguments or config file");
+            error!("mountpoint not present either in passed arguments or config file");
             return Ok(())
         }
     };
