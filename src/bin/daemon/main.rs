@@ -112,6 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
+            context.log_out().await.ok();
             polyfuse_sig_tx.send(()).ok();
             polyfuse.await?.ok();
 

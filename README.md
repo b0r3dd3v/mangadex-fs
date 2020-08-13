@@ -14,7 +14,7 @@ If you're looking for some _previously_ working code, check out [previous versio
 
 ## Usage
 
-There are 2 binaries now, the client `mangadex-fsc` and the daemon `mangadex-fsd`.
+`mangadex-fs` consists of 2 binaries, the client part `mangadex-fsc` and the daemon part `mangadex-fsd`.
 
 1. `cargo install mangadex-fs` (or clone this repo),
 2. checkout `mangadex-fsc --help` / `mangadex-fsd --help` (or `cargo run --release --bin mangadex-fsc -- --help`) on how to use,
@@ -46,7 +46,7 @@ OK
 
     So if you're calling `tree` on the mountpoint directory, you are basically asking for an IP ban.
     
-    This can also happen if you're using some fancy command line shells, be wary. `bash` looks safe.
+    The `readdir` can also happen if you're using some fancy command line shells (`fish` for example), even if you are not in the chapter directory.
 -   API responses are cached, and there is no command for fetching updates currently.
 -   ```sh
     cd <mountpoint>/<manga>/<chapter>
@@ -56,8 +56,9 @@ OK
     creates a good reader. Obviously you need to have [`feh`](https://github.com/derf/feh) installed.
 -   You can enable logging by setting `RUST_LOG` environment variable. More [here](https://docs.rs/env_logger/0.7.0/env_logger/).
 -   If you encounter a `socket error: Address already in use (os error 98)`, it means the socket file is still present in the runtime directory, you can remove it with `rm $XDG_RUNTIME_DIR/mangadex-fs/mangadex-fsd.sock`.
--   You can place a configuration file in `$XDG_CONFIG_HOME/mangadex-fs/config.toml`. It can be only provided with the socket file path for now, so it's mostly useless:
+-   You can place a configuration file in `$XDG_CONFIG_HOME/mangadex-fs/config.toml`. It can be only provided with the socket file path and mountpoint for now, so it's mostly useless:
 ```toml
+mountpoint = "/home/urmom/Manga/"
 socket = "/run/user/1000/mangadex-fs/mangadex-fsd.sock"
 ```
 

@@ -192,7 +192,7 @@ impl Connection {
                 ipc::Response::MarkChapterRead(Ok(()))
             },
             Err(error) => {
-                warn!("unfollow error: {:?}", error);
+                warn!("mark chapter read error: {:?}", error);
                 
                 match error {
                     api::APIError::Request(_) => ipc::Response::MarkChapterRead(Err("request error".into())),
@@ -208,7 +208,7 @@ impl Connection {
                 ipc::Response::MarkChapterUnread(Ok(()))
             },
             Err(error) => {
-                warn!("unfollow error: {:?}", error);
+                warn!("mark chapter unread error: {:?}", error);
                 
                 match error {
                     api::APIError::Request(_) => ipc::Response::MarkChapterUnread(Err("request error".into())),
