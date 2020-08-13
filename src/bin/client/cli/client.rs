@@ -109,12 +109,12 @@ fn id_validator(string: String) -> Result<(), String> {
     }
 }
 
-fn kill<'a, 'b>() -> clap::App<'a, 'b> {
+pub fn kill<'a, 'b>() -> clap::App<'a, 'b> {
     clap::SubCommand::with_name("kill")
         .about("Kills the mangadex-fsd daemon")
 }
 
-fn login<'a, 'b>() -> clap::App<'a, 'b> {
+pub fn login<'a, 'b>() -> clap::App<'a, 'b> {
     clap::SubCommand::with_name("login")
         .about("Creates a MangaDex session")
         .arg(clap::Arg::with_name("username")
@@ -135,12 +135,12 @@ fn login<'a, 'b>() -> clap::App<'a, 'b> {
             .long("show"))
 }
 
-fn logout<'a, 'b>() -> clap::App<'a, 'b> {
+pub fn logout<'a, 'b>() -> clap::App<'a, 'b> {
     clap::SubCommand::with_name("logout")
         .about("Ends current session")
 }
 
-fn search<'a, 'b>() -> clap::App<'a, 'b> {
+pub fn search<'a, 'b>() -> clap::App<'a, 'b> {
     clap::SubCommand::with_name("search")
         .about("Search")
         .arg(clap::Arg::with_name("sort")
@@ -216,7 +216,6 @@ pub fn chapter_mark<'a, 'b>() -> clap::App<'a, 'b> {
             .required(true)
             .validator(id_validator))
         .arg(clap::Arg::with_name("status")
-            .help("Read of unread")
             .takes_value(true)
             .required(true)
             .possible_values(&["read", "unread"]))
