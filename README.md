@@ -6,12 +6,6 @@ This is a basic implementation of FUSE driver utilising [MangaDex](https://manga
 
 ---
 
-### Version 0.2.0-beta
-
-If you're looking for some _previously_ working code, check out [previous version](https://github.com/bittersweetshimmer/mangadex-fs/tree/v0.1.5). I think it no longer works though.
-
----
-
 ## Usage
 
 `mangadex-fs` consists of 2 binaries, the client part `mangadex-fsc` and the daemon part `mangadex-fsd`.
