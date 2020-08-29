@@ -129,6 +129,8 @@ impl MangaDexFS {
                 drop(chapter_id_ref);
                 drop(read_lock);
 
+                debug!("chapter not fetched: {}", chapter_id);
+
                 match self.context.get_or_fetch_chapter(chapter_id).await {
                     Ok(_) => {
                         match self.context.entries.read().await.get(&op.ino()) {
@@ -136,7 +138,10 @@ impl MangaDexFS {
                             _ => Err(std::io::Error::from_raw_os_error(libc::ENOENT))
                         }
                     },
-                    Err(_) => Err(std::io::Error::from_raw_os_error(libc::EIO))
+                    Err(error) => {
+                        debug!("chapter fetching error: {}", error);
+                        Err(std::io::Error::from_raw_os_error(libc::EIO))
+                    }
                 }
             },
             Some(entry::Inode(entry::Entry::Page(_), _)) => Err(std::io::Error::from_raw_os_error(libc::ENOTDIR)),

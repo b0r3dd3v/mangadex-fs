@@ -1,27 +1,3 @@
-fn deserialize_long_strip_flag<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    struct Visitor;
-
-    impl<'de> serde::de::Visitor<'de> for Visitor {
-        type Value = bool;
-    
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            write!(formatter, "1 or 0")
-        }
-    
-        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error 
-        {
-            Ok(v == 1u64)
-        }
-    }
-
-    deserializer.deserialize_any(Visitor)
-}
-
 #[derive(Debug, serde::Deserialize)]
 pub struct Chapter {
     pub id: u64,
@@ -42,7 +18,6 @@ pub struct Chapter {
     pub comments: Option<u64>,
     pub server: String,
     pub page_array: Vec<String>,
-    #[serde(deserialize_with = "deserialize_long_strip_flag")]
     pub long_strip: bool,
     pub external: Option<String>
 }
