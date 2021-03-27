@@ -59,3 +59,4 @@ socket = "/run/user/1000/mangadex-fs/mangadex-fsd.sock"
 -   >Your code is a dumpster fire
 
     I bet! This is my first time using Rust for something more complicated than _Hello world_. If you have any guidelines or want to contribute go ahead, any help would be appreciated. With all these mutexes flying around I have no idea what I'm doing.
+Should use lock ewasion, bro.
