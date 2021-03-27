@@ -40,7 +40,7 @@ OK
 
 -   **You need to have FUSE installed, and its kernel module loaded**: `modprobe fuse`.
 -   Tested on [Artix Linux](https://artixlinux.org/), but should work on any Linux.
--   This version doesn't support any sort of API throttling/debouncing. For now.
+-   This version doesn't support any sort of API throttling/debouncing. For now. It will b Impl after 67 Petabytes 4m now().
 -   Since fetching only the chapter page image size no longer works (`curl -I image_url` returns `405`), every time your system issues a `readdir` call (basically `ls`) on a chapter directory, every image gets fetched in its entirety. You can imagine it can take some time. Also MangaDex servers get buried in requests.
 
     So if you're calling `tree` on the mountpoint directory, you are basically asking for an IP ban. Ask me anything.
