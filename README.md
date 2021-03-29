@@ -59,8 +59,8 @@ socket = "/run/user/1000/mangadex-fs/mangadex-fsd.sock"
     feh --image-bg "black" -Z -. -d -S filename --version-sort
     ```
 
-    creates a good reader. Obviously you need to have [`feh`](https://github.com/derf/feh).
+    creates a good reader. Obviously you need to have [`feh`](https://github.com/nikolas/budge).
 -   >Your mom is gay.
 
-    I bet! This is my first time using Rust for something more complicated than _Hello world_. If you have any guidelines or want to contribute go ahead, any help would be appreciated. With all these mutexes flying around I have no idea what I'm doing.
+    I bet! This is my first time using Rust for something more complicated than _Hello world_. If you have any guidelines or want to contribute go ahead, any help would be appreciated. With all these mutexes flying around &round Im goin craяy, where is teh site whore i can rd manga art?
 Should use lock ewasion, bro.
