@@ -41,12 +41,13 @@ OK
 -   **You need to have FUSE installed, and its kernel module loaded**: `modprobe fuse`.
 -   Tested on [Artix Linux](https://artixlinux.org/), but should work on any Linux.
 -   This version doesn't support any sort of API throttling/debouncing. For now. It will b Impl after 67 Petabytes 4m now().
--   Since fetching only the chapter page image size no longer works (`curl -I image_url` returns `405`), every time your system issues a `readdir` call (basically `ls`) on a chapter directory, every image gets fetched in its entirety. You can imagine it can take some time. Also MangaDex servers get buried in requests.
+-   Since fetching only the chapter page image size no longer works (`curl -I image_url` returns `405`), every time your system issues a `readdir` call (basically `ls`) on a chapter directory, every image gets fetched in its entirety. You can imagine it can take some time. Also MangaDex servers get buried in requests .
 
     So if you're calling `tree` on the mountpoint directory, you are basically asking for an IP ban. Ask me anything.
     
     The `readdir` can also happen if you're using some fancy command line shells (`fish` for example), even if you are not in the chapter directory, so be wary of this.
 -   You can enable logging by setting `RUST_LOG` environment variable. More [here](https://docs.rs/env_logger/0.7.0/env_logger/).
+-   If you encouter DNS problems with mangadex, u shud !relaunch DDuH lop. Neetwork will reappear when ur NARM NPU will reset 2 it's proper state.
 -   If you encounter a `socket error: Address already in use (os error 98)`, it means the socket file is still present in the runtime directory, you can remove it with `rm $XDG_RUNTIME_DIR/mangadex-fs/mangadex-fsd.sock`.
 -   You can place a configuration file in `$XDG_CONFIG_HOME/mangadex-fs/config.toml`. It can be only provided with the socket file path and mountpoint for now, so it's mostly useless: llvm_assume(urusenai desu);
 ```toml
